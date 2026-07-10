@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meta-Marker Market Intelligence Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <span class="logo-symbol">◆</span>
+                <h1>META-MARKER</h1>
+            </div>
+            <div class="header-right">
+                <button class="guide-btn" id="open-guide-btn">
+                    <span class="btn-icon">ⓘ</span> System Guide
+                </button>
+                <div class="header-status">
+                    <span class="pulse-indicator"></span>
+                    <span class="status-text">MIE LIVE (M15 XAU/USD)</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Grid Layout -->
+        <div class="dashboard-grid">
+
+            <!-- Regime & Classification Widget -->
+            <div class="card card-regime">
+                <div class="card-header">
+                    <h2>MARKET CLASSIFICATION</h2>
+                    <button class="info-trigger" data-topic="classification" aria-label="More Info">ⓘ</button>
+                </div>
+                <div class="regime-display">
+                    <div class="regime-title" id="market-regime">---</div>
+                    <div class="regime-sub" id="market-trend-state">Trend Classification</div>
+                </div>
+                <div class="classification-details">
+                    <div class="detail-item"
+                        data-tooltip="The structural rate of price change calculated over dynamic time windows.">
+                        <span class="detail-label">VOLATILITY</span>
+                        <span class="detail-value" id="market-volatility">---</span>
+                    </div>
+                    <div class="detail-item"
+                        data-tooltip="The velocity of price movement reflecting buying or selling pressure.">
+                        <span class="detail-label">MOMENTUM</span>
+                        <span class="detail-value" id="market-momentum">---</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Confidence Engine Dial -->
+            <div class="card card-confidence">
+                <div class="card-header">
+                    <h2>CONFIDENCE ENGINE</h2>
+                    <button class="info-trigger" data-topic="confidence" aria-label="More Info">ⓘ</button>
+                </div>
+                <div class="confidence-dial-container">
+                    <svg class="dial" viewBox="0 0 100 100">
+                        <circle class="dial-bg" cx="50" cy="50" r="40"></circle>
+                        <circle class="dial-fill" id="buy-dial" cx="50" cy="50" r="40" stroke-dasharray="251"
+                            stroke-dashoffset="251"></circle>
+                    </svg>
+                    <div class="dial-overlay">
+                        <div class="dial-val" id="buy-confidence-val">--%</div>
+                        <div class="dial-label" id="dial-recommendation">NEUTRAL</div>
+                    </div>
+                </div>
+                <div class="confidence-split">
+                    <div class="split-side buy-side"
+                        data-tooltip="Aggregated technical agreement pointing toward upward movement.">
+                        <span class="split-label">BUY CONFIDENCE</span>
+                        <span class="split-val" id="buy-val">--%</span>
+                    </div>
+                    <div class="split-side sell-side"
+                        data-tooltip="Aggregated technical agreement pointing toward downward movement.">
+                        <span class="split-label">SELL CONFIDENCE</span>
+                        <span class="split-val" id="sell-val">--%</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recommendation Alert -->
+            <div class="card card-recommendation">
+                <div class="card-header">
+                    <h2>ACTIONABLE RECOMMENDATION</h2>
+                    <button class="info-trigger" data-topic="recommendation" aria-label="More Info">ⓘ</button>
+                </div>
+                <div class="recommendation-box" id="recommendation-text">
+                    Waiting for market candles...
+                </div>
+            </div>
+
+            <!-- Real-Time Chart -->
+            <div class="card card-chart">
+                <div class="card-header">
+                    <h2>LIVE CHART & PRICE ACTION</h2>
+                    <button class="info-trigger" data-topic="chart" aria-label="More Info">ⓘ</button>
+                </div>
+                <div class="chart-container">
+                    <canvas id="price-chart"></canvas>
+                </div>
+            </div>
+
+            <!-- Indicator Score Grid -->
+            <div class="card card-indicators">
+                <div class="card-header">
+                    <h2>INDICATOR MATRIX & DYNAMIC SCORES</h2>
+                    <button class="info-trigger" data-topic="indicators" aria-label="More Info">ⓘ</button>
+                </div>
+                <div class="indicator-table-container">
+                    <table class="indicator-table">
+                        <thead>
+                            <tr>
+                                <th data-tooltip="The individual mechanical metric evaluated.">INDICATOR</th>
+                                <th data-tooltip="The directional bias output from this metric.">SIGNAL</th>
+                                <th data-tooltip="The exact mathematical output value.">VALUE</th>
+                                <th data-tooltip="Reliability score auto-weighted based on recent historical success.">
+                                    DYNAMIC RELIABILITY</th>
+                            </tr>
+                        </thead>
+                        <tbody id="indicators-body">
+                            <tr>
+                                <td colspan="4" class="empty-state">No indicator data loaded.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Reusable Informational Modal Popup -->
+    <div class="modal-overlay" id="info-modal">
+        <div class="modal-content">
+            <button class="modal-close" id="modal-close-btn">&times;</button>
+            <div class="modal-header">
+                <span class="modal-icon">◆</span>
+                <h3 id="modal-title">Component Detail</h3>
+            </div>
+            <div class="modal-body" id="modal-text">
+                Explanation text goes here.
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+
+</html>

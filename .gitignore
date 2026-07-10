@@ -1,0 +1,23 @@
+# Environments & Credentials
+.env
+.venv/
+env/
+venv/
+
+# Local databases
+*.db
+*.db-journal
+
+# Python caching
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.uv/
+
+# OS/Editor configs
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
