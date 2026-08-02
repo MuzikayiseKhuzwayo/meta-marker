@@ -605,3 +605,70 @@ body {
         justify-content: space-between;
     }
 }
+
+/* Dashboard Control Selector Group */
+.selector-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255, 255, 255, 0.02);
+    padding: 6px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+}
+
+.dashboard-select {
+    background: #121a2a;
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-family: var(--font-sans);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.dashboard-select:hover {
+    border-color: var(--color-cyan);
+}
+
+.dashboard-input {
+    background: rgba(10, 14, 23, 0.6);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-family: var(--font-sans);
+    font-size: 12px;
+    width: 150px;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.dashboard-input:focus {
+    border-color: var(--color-cyan);
+}
+
+.add-btn {
+    background: rgba(0, 240, 255, 0.1);
+    border: 1px solid rgba(0, 240, 255, 0.3);
+    color: var(--color-cyan);
+    font-weight: 700;
+    font-size: 16px;
+    width: 30px;
+    height: 30px;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.add-btn:hover {
+    background: var(--color-cyan);
+    color: #0a0e17;
+}

@@ -9,6 +9,8 @@ class Candle(BaseModel):
     low: float = Field(..., description="Low price")
     close: float = Field(..., description="Close price")
     volume: float = Field(0.0, description="Volume")
+    symbol: str = Field("XAUUSD", description="Symbol name")
+    timeframe: str = Field("M15", description="Time signature, e.g. M5, M15, H1")
 
 class MarketClassification(BaseModel):
     trend_state: str = Field(..., description="e.g., 'Strong Uptrend', 'Strong Downtrend', 'Ranging (Choppy)', 'Ranging (Tight)'")
@@ -23,6 +25,8 @@ class IndicatorSignal(BaseModel):
     confidence: float = Field(..., description="Confidence weight between 0.0 and 1.0")
 
 class MarketStateResponse(BaseModel):
+    symbol: str = Field("XAUUSD", description="Symbol name")
+    timeframe: str = Field("M15", description="Time signature")
     candle: Candle
     classification: MarketClassification
     indicator_signals: Dict[str, IndicatorSignal]

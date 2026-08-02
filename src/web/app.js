@@ -1,11 +1,13 @@
-// Meta-Marker Front-End Dashboard logic
+// Meta-Marker Front-End Dashboard logic with WebSockets & Advanced Chart Overlays
 
 document.addEventListener("DOMContentLoaded", () => {
     initDashboard();
     initModalHandlers();
 });
 
-let statePollingInterval;
+let currentSymbol = "XAUUSD";
+let currentTimeframe = "M15";
+let wsConnection = null;
 
 // Definitions mapping for explanation Modals
 const TOPIC_EXPLANATIONS = {
@@ -13,8 +15,8 @@ const TOPIC_EXPLANATIONS = {
         title: "Meta-Marker Dashboard Overview",
         html: `
             <p>Welcome to the <strong>Meta-Marker Market Intelligence Dashboard</strong>.</p>
-            <p>This analytics interface aggregates algorithmic telemetry, statistical classifications, and real-time technical indicators to provide concrete execution strategies for the M15 XAU/USD timeframe.</p>
-            <p><strong>Workflow:</strong> Monitor the Market Classification to determine the trade posture, observe the Confidence Engine for operational convergence, and execute structural strategies via the Actionable Recommendation card.</p>
+            <p>This analytics interface aggregates algorithmic telemetry, statistical classifications, and real-time technical indicators to provide concrete execution strategies across multiple symbols and timeframes.</p>
+            <p><strong>Visual Overlays:</strong> The chart draws dynamic SMA/EMA trend lines, structural Support & Resistance lines, and identifies local Swing Points in real-time.</p>
         `
     },
     classification: {
@@ -23,57 +25,196 @@ const TOPIC_EXPLANATIONS = {
             <p>Classifying market structures assists in determining which algorithms should take dominance in the current setup.</p>
             <p><strong>Primary Regime:</strong> Displays whether the market is consolidating (mean-reverting), expanding structurally, or trending aggressively.</p>
             <p><strong>Trend Classification:</strong> Tracks micro-structures such as Higher Highs, Lower Lows, or structural breaks.</p>
-            <p><strong>Volatility & Momentum:</strong> Monitors changes in current market standard deviation levels and real-time momentum velocity relative to baseline ranges.</p>
         `
     },
     confidence: {
         title: "Confidence Engine",
         html: `
             <p>The <strong>Confidence Engine</strong> compiles mathematical inputs across all sub-indicators and ranks active directional flow.</p>
-            <p>The dial shows dynamic weighted results:
-                <ul>
-                    <li><strong>Buy Confidence (Green):</strong> Signal convergence favoring upward breakout vectors.</li>
-                    <li><strong>Sell Confidence (Red):</strong> Signal convergence favoring downward breakout vectors.</li>
-                    <li><strong>Neutral (Cyan):</strong> Contradicting indicators suggesting low probability conditions.</li>
-                </ul>
-            </p>
-            <p>An execution bias occurs when any single direction exceeds a 60% threshold limit.</p>
+            <p>The dial shows dynamic weighted results based on dynamic reliability scores updated in the database.</p>
         `
     },
     recommendation: {
         title: "Actionable Recommendation",
         html: `
-            <p>The <strong>Actionable Recommendation</strong> is computed by an automated expert filter matrix.</p>
-            <p>It processes underlying volatility, momentum ranges, and dynamic indicator weights to propose clear, systematic guidelines:</p>
-            <p><strong>"BUY" or "SELL":</strong> Executes only when structural validation conditions align with strong dynamic reliability parameters.</p>
-            <p><strong>"HOLD/WAIT":</strong> Enforces caution during high-volatility events, low liquidity times, or when indicator conflicts occur.</p>
+            <p>The <strong>Actionable Recommendation</strong> processes underlying volatility, momentum ranges, and dynamic indicator weights to propose clear, systematic guidelines.</p>
         `
     },
     chart: {
         title: "Live Price Action Chart",
         html: `
-            <p>This panel renders real-time structural candlestick history directly onto the interface canvas.</p>
-            <p>The visual engine maps classic candlestick formations on the M15 timeframe, scaling prices with a percentage buffer dynamically.</p>
-            <p>Bullish candles are highlighted in <strong>Cyan</strong>, and Bearish candles are displayed in <strong>Red</strong> to match system-wide color variables.</p>
+            <p>Renders real-time candlestick history directly. In addition to candles, it overlays:
+                <ul>
+                    <li><strong style="color: #ffd700;">EMA 20 (Gold Line)</strong>: Short-term momentum filter.</li>
+                    <li><strong style="color: #a855f7;">EMA 50 (Purple Line)</strong>: Medium-term trend bias filter.</li>
+                    <li><strong style="color: rgba(5,255,197,0.7);">Support Levels (Green Dashed)</strong>: Key horizontal buying floors.</li>
+                    <li><strong style="color: rgba(255,59,48,0.7);">Resistance Levels (Red Dashed)</strong>: Key horizontal selling ceilings.</li>
+                </ul>
+            </p>
         `
     },
     indicators: {
         title: "Indicator Matrix & Dynamic Scores",
         html: `
-            <p>The <strong>Indicator Matrix</strong> exposes active calculations from localized sub-algorithms.</p>
-            <p><strong>Value:</strong> Raw calculations from underlying momentum metrics, moving averages, and structural patterns.</p>
             <p><strong>Dynamic Reliability:</strong> Dynamic weights tracking the recent statistical win-rate accuracy of each specific indicator in the current market regime.</p>
         `
     }
 };
 
-function initDashboard() {
-    fetchDashboardData();
-    // Poll every 10 seconds for new updates
-    statePollingInterval = setInterval(fetchDashboardData, 10000);
+async function initDashboard() {
+    setupSelectors();
+    await fetchActiveTargets();
+    await fetchBrokerSymbols();
+    await fetchDashboardData();
+    connectWebSocket();
 }
 
-// Modal handling logic
+// Setup selector dropdown change events and dynamic add symbol input
+function setupSelectors() {
+    const symSelect = document.getElementById("symbol-select");
+    const tfSelect = document.getElementById("timeframe-select");
+    const addInput = document.getElementById("add-symbol-input");
+    const addBtn = document.getElementById("add-symbol-btn");
+
+    symSelect.addEventListener("change", (e) => {
+        currentSymbol = e.target.value;
+        updateHeaderStatus();
+        fetchDashboardData();
+    });
+
+    tfSelect.addEventListener("change", (e) => {
+        currentTimeframe = e.target.value;
+        updateHeaderStatus();
+        fetchDashboardData();
+    });
+
+    addBtn.addEventListener("click", async () => {
+        const value = addInput.value.trim().toUpperCase();
+        if (value) {
+            try {
+                const res = await fetch("/api/monitor/add", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ symbol: value, timeframe: currentTimeframe })
+                });
+                if (res.ok) {
+                    addInput.value = "";
+                    await fetchActiveTargets();
+                    symSelect.value = value;
+                    currentSymbol = value;
+                    updateHeaderStatus();
+                    fetchDashboardData();
+                }
+            } catch (err) {
+                console.error("Failed to add symbol:", err);
+            }
+        }
+    });
+}
+
+function updateHeaderStatus() {
+    const statusText = document.getElementById("header-status-text");
+    statusText.textContent = `MIE LIVE (${currentTimeframe} ${currentSymbol})`;
+}
+
+async function fetchActiveTargets() {
+    try {
+        const response = await fetch("/api/monitor/targets");
+        if (response.ok) {
+            const targets = await response.json();
+            const symSelect = document.getElementById("symbol-select");
+            const currentVal = symSelect.value;
+            
+            symSelect.innerHTML = "";
+            // Find unique symbols in targets
+            const uniqueSymbols = [...new Set(targets.map(t => t.symbol))];
+            uniqueSymbols.forEach(symbol => {
+                const opt = document.createElement("option");
+                opt.value = symbol;
+                opt.textContent = symbol;
+                symSelect.appendChild(opt);
+            });
+            if (uniqueSymbols.includes(currentVal)) {
+                symSelect.value = currentVal;
+            }
+        }
+    } catch (err) {
+        console.error("Failed to load targets:", err);
+    }
+}
+
+async function fetchBrokerSymbols() {
+    try {
+        const response = await fetch("/api/broker/symbols");
+        if (response.ok) {
+            const allSymbols = await response.json();
+            const addInput = document.getElementById("add-symbol-input");
+            // Set up basic datalist for autocompletion
+            let datalist = document.getElementById("broker-symbols-datalist");
+            if (!datalist) {
+                datalist = document.createElement("datalist");
+                datalist.id = "broker-symbols-datalist";
+                document.body.appendChild(datalist);
+            }
+            datalist.innerHTML = "";
+            allSymbols.slice(0, 50).forEach(sym => {
+                const opt = document.createElement("option");
+                opt.value = sym;
+                datalist.appendChild(opt);
+            });
+            addInput.setAttribute("list", "broker-symbols-datalist");
+        }
+    } catch (err) {}
+}
+
+async function fetchDashboardData() {
+    try {
+        const response = await fetch(`/api/state?symbol=${currentSymbol}&timeframe=${currentTimeframe}`);
+        if (!response.ok) {
+            displayWaitingState();
+            return;
+        }
+        const data = await response.json();
+        updateUI(data);
+        drawChart(data);
+    } catch (err) {
+        console.error("Dashboard data load error:", err);
+        displayWaitingState();
+    }
+}
+
+// Websocket logic
+function connectWebSocket() {
+    const loc = window.location;
+    const wsUri = (loc.protocol === "https:" ? "wss://" : "ws://") + loc.host + "/ws";
+    
+    wsConnection = new WebSocket(wsUri);
+
+    wsConnection.onmessage = (event) => {
+        try {
+            const payload = JSON.parse(event.data);
+            // Verify if payload belongs to current active target
+            if (payload.symbol.toUpperCase() === currentSymbol.toUpperCase() && payload.timeframe === currentTimeframe) {
+                updateUI(payload);
+                drawChart(payload);
+            }
+        } catch (e) {
+            console.error("WebSocket message parse error:", e);
+        }
+    };
+
+    wsConnection.onclose = () => {
+        // Reconnect after 5 seconds
+        setTimeout(connectWebSocket, 5000);
+    };
+
+    wsConnection.onerror = (err) => {
+        console.error("WebSocket error:", err);
+        wsConnection.close();
+    };
+}
+
+// Modal handlers
 function initModalHandlers() {
     const modal = document.getElementById("info-modal");
     const modalTitle = document.getElementById("modal-title");
@@ -94,7 +235,6 @@ function initModalHandlers() {
         modal.classList.remove("active");
     }
 
-    // Attach event listeners to every interactive info icon
     document.querySelectorAll(".info-trigger").forEach(btn => {
         btn.addEventListener("click", (e) => {
             e.stopPropagation();
@@ -103,51 +243,16 @@ function initModalHandlers() {
         });
     });
 
-    // General system guide button at the top
     if (guideBtn) {
         guideBtn.addEventListener("click", () => {
             openModal("system");
         });
     }
 
-    // Close on click close button, close on overlay background click
-    if (closeBtn) {
-        closeBtn.addEventListener("click", closeModal);
-    }
-
+    if (closeBtn) closeBtn.addEventListener("click", closeModal);
     modal.addEventListener("click", (e) => {
-        if (e.target === modal) {
-            closeModal();
-        }
+        if (e.target === modal) closeModal();
     });
-
-    // Close on ESC key press
-    document.addEventListener("keydown", (e) => {
-        if (e.key === "Escape" && modal.classList.contains("active")) {
-            closeModal();
-        }
-    });
-}
-
-async function fetchDashboardData() {
-    try {
-        const response = await fetch("/api/state");
-        if (!response.ok) {
-            throw new Error("No data ingested yet.");
-        }
-        const data = await response.json();
-        updateUI(data);
-        drawChart(data);
-    } catch (err) {
-        console.error("Dashboard render error:", err);
-        // Display the error on screen to diagnose the issue
-        document.getElementById("recommendation-text").innerHTML = `
-            <div style="font-size: 14px; color: var(--color-red); text-align: left; width: 100%;">
-                <p><strong>Dashboard Error detected:</strong></p>
-                <p style="margin-top: 4px; font-family: monospace; font-size: 12px; background: rgba(0,0,0,0.2); padding: 8px; border-radius: 6px; overflow-x: auto;">${err.stack || err.message}</p>
-            </div>
-        `;
-    }
 }
 
 function displayWaitingState() {
@@ -161,33 +266,35 @@ function displayWaitingState() {
     document.getElementById("dial-recommendation").textContent = "HOLD";
     document.getElementById("recommendation-text").innerHTML = `
         <div style="font-size: 14px;">
-            <p><strong>Meta-Marker engine is running.</strong></p>
-            <p style="margin-top: 8px; color: var(--text-secondary);">Please send M15 OHLC candle data via the MT5 EA or API endpoint <code>POST /api/candles</code> to initiate analysis.</p>
+            <p><strong>No data ingested for ${currentSymbol} on ${currentTimeframe}.</strong></p>
+            <p style="margin-top: 8px; color: var(--text-secondary);">Ensure your MetaTrader 5 terminal is connected, DLL imports are enabled, and the sync target is active.</p>
         </div>
     `;
+    
+    // Clear chart canvas
+    const canvas = document.getElementById("price-chart");
+    if (canvas) {
+        const ctx = canvas.getContext("2d");
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
 }
 
 function updateUI(data) {
-    // 1. Regime Details
     document.getElementById("market-regime").textContent = data.classification.primary_regime.toUpperCase();
     document.getElementById("market-trend-state").textContent = data.classification.trend_state;
     document.getElementById("market-volatility").textContent = data.classification.volatility_state.toUpperCase();
     document.getElementById("market-momentum").textContent = data.classification.momentum_state.toUpperCase();
 
-    // 2. Confidence Dials
     const buyConf = Math.round(data.confidence_buy);
     const sellConf = Math.round(data.confidence_sell);
 
     document.getElementById("buy-val").textContent = `${buyConf}%`;
     document.getElementById("sell-val").textContent = `${sellConf}%`;
 
-    // Circle progress calc
     const circleFill = document.getElementById("buy-dial");
-    const percentage = buyConf; // Scale dial to show buy strength
-    const strokeOffset = 251 - (251 * percentage / 100);
+    const strokeOffset = 251 - (251 * buyConf / 100);
     circleFill.style.strokeDashoffset = strokeOffset;
 
-    // Dial display styling
     const dialVal = document.getElementById("buy-confidence-val");
     const dialRec = document.getElementById("dial-recommendation");
     dialVal.textContent = `${buyConf}%`;
@@ -208,7 +315,6 @@ function updateUI(data) {
         dialRec.style.color = "var(--color-cyan)";
     }
 
-    // 3. Recommendation Box
     const recBox = document.getElementById("recommendation-text");
     recBox.textContent = data.recommendation;
     if (data.recommendation.includes("BUY")) {
@@ -225,7 +331,6 @@ function updateUI(data) {
         recBox.style.color = "var(--color-cyan)";
     }
 
-    // 4. Indicator Table Grid
     const tbody = document.getElementById("indicators-body");
     tbody.innerHTML = "";
 
@@ -238,9 +343,7 @@ function updateUI(data) {
         else if (sig.signal === "SELL") sigClass = "sig-sell";
 
         let displayVal = sig.value.toFixed(2);
-        if (key === "Market_Structure") {
-            displayVal = "Aligned";
-        }
+        if (key === "Market_Structure") displayVal = "Aligned";
 
         row.innerHTML = `
             <td><strong>${sig.name.replace("_", " ")}</strong></td>
@@ -252,44 +355,71 @@ function updateUI(data) {
     });
 }
 
+// Indicator overlay calculators helper
+function calculateEMA(prices, period) {
+    if (prices.length < period) return [];
+    const emas = [];
+    const k = 2 / (period + 1);
+    let sum = 0;
+    for (let i = 0; i < period; i++) sum += prices[i];
+    emas.push(sum / period);
+    for (let i = period; i < prices.length; i++) {
+        emas.push((prices[i] - emas[emas.length - 1]) * k + emas[emas.length - 1]);
+    }
+    return emas;
+}
+
+function identifySwingLevels(history) {
+    const supports = [];
+    const resistances = [];
+    // Local window S/R: check surrounding 4 candles
+    for (let i = 4; i < history.length - 4; i++) {
+        const currentHigh = history[i].high;
+        const currentLow = history[i].low;
+        let isHigh = true;
+        let isLow = true;
+        
+        for (let j = -4; j <= 4; j++) {
+            if (j === 0) continue;
+            if (history[i + j].high > currentHigh) isHigh = false;
+            if (history[i + j].low < currentLow) isLow = false;
+        }
+        if (isHigh) resistances.push(currentHigh);
+        if (isLow) supports.push(currentLow);
+    }
+    return { 
+        supports: [...new Set(supports)].slice(-3), 
+        resistances: [...new Set(resistances)].slice(-3) 
+    };
+}
+
 function drawChart(data) {
     const canvas = document.getElementById("price-chart");
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
 
-    // Setup high DPI canvas
     const rect = canvas.getBoundingClientRect();
     canvas.width = rect.width;
     canvas.height = rect.height;
-
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     const width = canvas.width;
     const height = canvas.height;
 
     const paddingLeft = 10;
-    const paddingRight = 60; // Space for price labels on the right
+    const paddingRight = 60;
     const paddingTop = 20;
-    const paddingBottom = 20; // Space for time labels at the bottom
+    const paddingBottom = 20;
 
     const chartWidth = width - paddingLeft - paddingRight;
     const chartHeight = height - paddingTop - paddingBottom;
 
     const history = data.history || [];
-    if (history.length === 0) {
-        // Fallback: draw placeholder text
-        ctx.fillStyle = "var(--text-secondary)";
-        ctx.font = "14px Outfit, sans-serif";
-        ctx.textAlign = "center";
-        ctx.fillText("No chart history available yet", width / 2, height / 2);
-        return;
-    }
+    if (history.length === 0) return;
 
-    // Find min and max prices to scale y-axis
     let minPrice = Math.min(...history.map(c => c.low));
     let maxPrice = Math.max(...history.map(c => c.high));
 
-    // Add a small margin to top and bottom of chart scaling
     const priceRange = maxPrice - minPrice;
     const priceMargin = priceRange * 0.1 || 1.0;
     minPrice -= priceMargin;
@@ -312,63 +442,118 @@ function drawChart(data) {
         const ratio = i / (gridLinesCount - 1);
         const price = maxPrice - ratio * (maxPrice - minPrice);
         const y = scaleY(price);
-
-        // Horizontal Gridline
         ctx.beginPath();
         ctx.moveTo(paddingLeft, y);
         ctx.lineTo(paddingLeft + chartWidth, y);
         ctx.stroke();
-
-        // Price Label on the right axis
         ctx.fillText(price.toFixed(2), paddingLeft + chartWidth + 8, y);
     }
 
-    // Draw Candlesticks
     const candleWidth = chartWidth / history.length;
-    const bodyPadding = Math.max(1, candleWidth * 0.2); // 20% padding between bodies
+    const bodyPadding = Math.max(1, candleWidth * 0.2);
 
+    // Calculate indicator overlay vectors (EMA 20 & EMA 50)
+    const closes = history.map(c => c.close);
+    const ema20 = calculateEMA(closes, 20);
+    const ema50 = calculateEMA(closes, 50);
+    
+    // Calculate Swing Structure floors and ceilings
+    const structure = identifySwingLevels(history);
+
+    // 1. Draw Support and Resistance zones overlay (dashed indicator lines)
+    ctx.lineWidth = 1;
+    structure.supports.forEach(level => {
+        const y = scaleY(level);
+        ctx.strokeStyle = "rgba(5, 255, 197, 0.35)"; // green dashed support
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        ctx.moveTo(paddingLeft, y);
+        ctx.lineTo(paddingLeft + chartWidth, y);
+        ctx.stroke();
+        ctx.setLineDash([]); // Reset dash
+    });
+
+    structure.resistances.forEach(level => {
+        const y = scaleY(level);
+        ctx.strokeStyle = "rgba(255, 59, 48, 0.35)"; // red dashed resistance
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        ctx.moveTo(paddingLeft, y);
+        ctx.lineTo(paddingLeft + chartWidth, y);
+        ctx.stroke();
+        ctx.setLineDash([]);
+    });
+
+    // 2. Draw Candlesticks
     history.forEach((candle, idx) => {
         const x = paddingLeft + idx * candleWidth + candleWidth / 2;
-
         const yOpen = scaleY(candle.open);
         const yClose = scaleY(candle.close);
         const yHigh = scaleY(candle.high);
         const yLow = scaleY(candle.low);
 
         const isBullish = candle.close >= candle.open;
-        const color = isBullish ? "#05ffc5" : "#ff3b30"; // Green / Red
+        const color = isBullish ? "#05ffc5" : "#ff3b30";
 
         ctx.strokeStyle = color;
         ctx.fillStyle = color;
         ctx.lineWidth = 1.5;
 
-        // 1. Draw Wick (high to low)
+        // Draw Wick
         ctx.beginPath();
         ctx.moveTo(x, yHigh);
         ctx.lineTo(x, yLow);
         ctx.stroke();
 
-        // 2. Draw Body (open to close)
+        // Draw Body
         const bodyWidth = candleWidth - bodyPadding * 2;
         const bodyHeight = Math.max(1.5, Math.abs(yClose - yOpen));
         const bodyX = x - bodyWidth / 2;
         const bodyY = Math.min(yOpen, yClose);
-
         ctx.fillRect(bodyX, bodyY, bodyWidth, bodyHeight);
 
-        // Draw Time labels at the bottom for every 8th candle
+        // Draw Time label axis
         if (idx % 8 === 0) {
             ctx.fillStyle = "var(--text-secondary)";
             ctx.textAlign = "center";
             ctx.textBaseline = "top";
-
-            // Format time: HH:MM
             try {
                 const date = new Date(candle.time);
                 const hrs = String(date.getUTCHours()).padStart(2, '0');
                 const mins = String(date.getUTCMinutes()).padStart(2, '0');
                 ctx.fillText(`${hrs}:${mins}`, x, paddingBottom + chartHeight + 4);
-            } catch (e) { }
+            } catch (e) {}
         }
     });
+
+    // 3. Draw EMA curves overlay
+    // Draw EMA 20 (Gold line)
+    if (ema20.length > 0) {
+        ctx.strokeStyle = "#ffd700"; // Gold
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        const startIdx = history.length - ema20.length;
+        ctx.moveTo(paddingLeft + startIdx * candleWidth + candleWidth/2, scaleY(ema20[0]));
+        for (let i = 1; i < ema20.length; i++) {
+            const idx = startIdx + i;
+            const x = paddingLeft + idx * candleWidth + candleWidth/2;
+            ctx.lineTo(x, scaleY(ema20[i]));
+        }
+        ctx.stroke();
+    }
+
+    // Draw EMA 50 (Purple line)
+    if (ema50.length > 0) {
+        ctx.strokeStyle = "#a855f7"; // Purple
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        const startIdx = history.length - ema50.length;
+        ctx.moveTo(paddingLeft + startIdx * candleWidth + candleWidth/2, scaleY(ema50[0]));
+        for (let i = 1; i < ema50.length; i++) {
+            const idx = startIdx + i;
+            const x = paddingLeft + idx * candleWidth + candleWidth/2;
+            ctx.lineTo(x, scaleY(ema50[i]));
+        }
+        ctx.stroke();
+    }
 }

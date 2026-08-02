@@ -12,25 +12,32 @@ class Database:
         self._init_db()
 
     def _get_connection(self):
+        if self.db_path == ":memory:":
+            if not hasattr(self, "_conn") or self._conn is None:
+                self._conn = sqlite3.connect(self.db_path)
+            return self._conn
         return sqlite3.connect(self.db_path)
 
     def _init_db(self):
         with self._get_connection() as conn:
             cursor = conn.cursor()
             
-            # Create candles table
+            # Create candles table supporting multi-symbol and multi-timeframe
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS candles (
-                    time TEXT PRIMARY KEY,
+                    symbol TEXT NOT NULL,
+                    timeframe TEXT NOT NULL,
+                    time TEXT NOT NULL,
                     open REAL NOT NULL,
                     high REAL NOT NULL,
                     low REAL NOT NULL,
                     close REAL NOT NULL,
-                    volume REAL NOT NULL
+                    volume REAL NOT NULL,
+                    PRIMARY KEY (symbol, timeframe, time)
                 )
             """)
             
-            # Create indicator_scores table (scored by market regime: trend or range)
+            # Create indicator_scores table
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS indicator_scores (
                     indicator_name TEXT NOT NULL,
@@ -42,14 +49,17 @@ class Database:
                 )
             """)
             
-            # Create classifications table
+            # Create classifications table supporting multi-symbol and multi-timeframe
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS classifications (
-                    time TEXT PRIMARY KEY,
+                    symbol TEXT NOT NULL,
+                    timeframe TEXT NOT NULL,
+                    time TEXT NOT NULL,
                     trend_state TEXT NOT NULL,
                     volatility_state TEXT NOT NULL,
                     momentum_state TEXT NOT NULL,
-                    primary_regime TEXT NOT NULL
+                    primary_regime TEXT NOT NULL,
+                    PRIMARY KEY (symbol, timeframe, time)
                 )
             """)
             conn.commit()
@@ -58,9 +68,11 @@ class Database:
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                INSERT OR REPLACE INTO candles (time, open, high, low, close, volume)
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT OR REPLACE INTO candles (symbol, timeframe, time, open, high, low, close, volume)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """, (
+                candle.symbol,
+                candle.timeframe,
                 candle.time.isoformat(),
                 candle.open,
                 candle.high,
@@ -70,15 +82,16 @@ class Database:
             ))
             conn.commit()
 
-    def get_candles(self, limit: int = 500) -> List[Candle]:
+    def get_candles(self, symbol: str = "XAUUSD", timeframe: str = "M15", limit: int = 500) -> List[Candle]:
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT time, open, high, low, close, volume 
+                SELECT time, open, high, low, close, volume, symbol, timeframe
                 FROM candles 
+                WHERE symbol = ? AND timeframe = ?
                 ORDER BY time ASC 
                 LIMIT ?
-            """, (limit,))
+            """, (symbol, timeframe, limit))
             rows = cursor.fetchall()
             
             candles = []
@@ -89,17 +102,21 @@ class Database:
                     high=r[2],
                     low=r[3],
                     close=r[4],
-                    volume=r[5]
+                    volume=r[5],
+                    symbol=r[6],
+                    timeframe=r[7]
                 ))
             return candles
 
-    def save_classification(self, timestamp: datetime, classification: MarketClassification):
+    def save_classification(self, timestamp: datetime, classification: MarketClassification, symbol: str = "XAUUSD", timeframe: str = "M15"):
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                INSERT OR REPLACE INTO classifications (time, trend_state, volatility_state, momentum_state, primary_regime)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT OR REPLACE INTO classifications (symbol, timeframe, time, trend_state, volatility_state, momentum_state, primary_regime)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
             """, (
+                symbol,
+                timeframe,
                 timestamp.isoformat(),
                 classification.trend_state,
                 classification.volatility_state,
@@ -108,12 +125,13 @@ class Database:
             ))
             conn.commit()
 
-    def get_latest_classification(self) -> Optional[MarketClassification]:
+    def get_latest_classification(self, symbol: str = "XAUUSD", timeframe: str = "M15") -> Optional[MarketClassification]:
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT trend_state, volatility_state, momentum_state, primary_regime 
                 FROM classifications 
+                WHERE symbol = ? AND timeframe = ?
                 ORDER BY time DESC 
                 LIMIT 1
             """)
@@ -128,9 +146,6 @@ class Database:
             return None
 
     def get_indicator_scores(self) -> Dict[str, Dict[str, float]]:
-        """
-        Returns scores in format: {indicator_name: {regime: score}}
-        """
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT indicator_name, regime, score FROM indicator_scores")
@@ -147,7 +162,6 @@ class Database:
     def update_indicator_score(self, indicator_name: str, regime: str, is_correct: bool):
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            # Select current values
             cursor.execute("""
                 SELECT score, num_predictions, num_correct 
                 FROM indicator_scores 
@@ -160,7 +174,6 @@ class Database:
                 num_preds += 1
                 if is_correct:
                     num_corr += 1
-                # Recalculate score (rolling average or simple accuracy percentage)
                 new_score = (num_corr / num_preds) * 100.0
             else:
                 num_preds = 1

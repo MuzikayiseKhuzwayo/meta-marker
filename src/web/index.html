@@ -19,12 +19,26 @@
                 <h1>META-MARKER</h1>
             </div>
             <div class="header-right">
+                <div class="selector-group">
+                    <select id="symbol-select" class="dashboard-select">
+                        <option value="XAUUSD">XAUUSD</option>
+                    </select>
+                    <select id="timeframe-select" class="dashboard-select">
+                        <option value="M5">M5</option>
+                        <option value="M15" selected>M15</option>
+                        <option value="H1">H1</option>
+                        <option value="H4">H4</option>
+                        <option value="D1">D1</option>
+                    </select>
+                    <input type="text" id="add-symbol-input" placeholder="Add Symbol (e.g. BTCUSD)" class="dashboard-input">
+                    <button id="add-symbol-btn" class="add-btn">+</button>
+                </div>
                 <button class="guide-btn" id="open-guide-btn">
                     <span class="btn-icon">ⓘ</span> System Guide
                 </button>
                 <div class="header-status">
                     <span class="pulse-indicator"></span>
-                    <span class="status-text">MIE LIVE (M15 XAU/USD)</span>
+                    <span class="status-text" id="header-status-text">MIE LIVE (M15 XAU/USD)</span>
                 </div>
             </div>
         </header>
