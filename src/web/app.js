@@ -62,9 +62,128 @@ const TOPIC_EXPLANATIONS = {
         `
     },
     indicators: {
-        title: "Indicator Matrix & Dynamic Scores",
+        title: "Indicator Matrix & Dynamic Scores Overview",
         html: `
-            <p><strong>Dynamic Reliability:</strong> Dynamic weights tracking the recent statistical win-rate accuracy of each specific indicator in the current market regime.</p>
+            <p>The <strong>Indicator Matrix</strong> evaluates multiple non-correlated technical algorithms across every closed bar.</p>
+            <p>Click any indicator row or column header in the table to display its exact mathematical formula, signal thresholds, and reliability weight calculations.</p>
+        `
+    },
+    // Indicator Specific Modal Guides
+    ind_sma: {
+        title: "SMA (Simple Moving Average 20 / 50)",
+        html: `
+            <p><strong>Simple Moving Average (SMA)</strong> calculates the unweighted arithmetic mean of closing prices over 20 and 50 period windows.</p>
+            <div class="modal-badge-group">
+                <span class="modal-badge badge-buy">BUY Signal</span> Fast SMA (20) crosses above Slow SMA (50) — Golden Cross alignment.
+            </div>
+            <div class="modal-badge-group">
+                <span class="modal-badge badge-sell">SELL Signal</span> Fast SMA (20) crosses below Slow SMA (50) — Death Cross alignment.
+            </div>
+            <p style="margin-top: 10px;"><strong>Formula:</strong> <code>SMA = (P1 + P2 + ... + Pn) / n</code></p>
+        `
+    },
+    ind_ema: {
+        title: "EMA (Exponential Moving Average 20 / 50)",
+        html: `
+            <p><strong>Exponential Moving Average (EMA)</strong> applies exponentially higher weighting to recent price bars, providing earlier trend bias identification with reduced lag.</p>
+            <div class="modal-badge-group">
+                <span class="modal-badge badge-buy">BUY Signal</span> Price > EMA 20 AND EMA 20 > EMA 50 (Bullish Momentum Stack).
+            </div>
+            <div class="modal-badge-group">
+                <span class="modal-badge badge-sell">SELL Signal</span> Price < EMA 20 AND EMA 20 < EMA 50 (Bearish Momentum Stack).
+            </div>
+            <p style="margin-top: 10px;"><strong>Formula:</strong> <code>EMA = (Close * K) + (Prev_EMA * (1 - K))</code> where <code>K = 2 / (Period + 1)</code></p>
+        `
+    },
+    ind_rsi: {
+        title: "RSI (Relative Strength Index - 14 Period)",
+        html: `
+            <p><strong>Relative Strength Index (RSI)</strong> measures speed and momentum of price movements on a scale of 0 to 100.</p>
+            <div class="modal-badge-group">
+                <span class="modal-badge badge-buy">BUY Signal</span> RSI < 35 (Oversold reversal) OR bullish crossover above centerline 50.
+            </div>
+            <div class="modal-badge-group">
+                <span class="modal-badge badge-sell">SELL Signal</span> RSI > 65 (Overbought reversal) OR bearish crossover below centerline 50.
+            </div>
+            <p style="margin-top: 10px;"><strong>Formula:</strong> <code>RSI = 100 - (100 / (1 + RS))</code> where <code>RS = Avg Gain / Avg Loss</code></p>
+        `
+    },
+    ind_macd: {
+        title: "MACD (Moving Average Convergence Divergence 12, 26, 9)",
+        html: `
+            <p><strong>MACD</strong> evaluates relationship dynamics between two exponential moving averages. The histogram measures the delta between the MACD line and 9-period Signal line.</p>
+            <div class="modal-badge-group">
+                <span class="modal-badge badge-buy">BUY Signal</span> MACD Line crosses above Signal Line (Positive Histogram Expansion).
+            </div>
+            <div class="modal-badge-group">
+                <span class="modal-badge badge-sell">SELL Signal</span> MACD Line crosses below Signal Line (Negative Histogram Expansion).
+            </div>
+        `
+    },
+    ind_atr: {
+        title: "ATR (Average True Range - 14 Period)",
+        html: `
+            <p><strong>Average True Range (ATR)</strong> decomposes total market volatility across 14 periods.</p>
+            <div class="modal-badge-group">
+                <span class="modal-badge badge-neutral">VOLATILITY METRIC</span> Used systematically to compute dynamic Stop Losses (e.g. <code>2.0 * ATR</code>) and Take Profit targets.
+            </div>
+            <p style="margin-top: 10px;"><strong>Formula:</strong> <code>TR = Max(High - Low, |High - PrevClose|, |Low - PrevClose|)</code></p>
+        `
+    },
+    ind_structure: {
+        title: "Market Structure (Swing Sequence)",
+        html: `
+            <p><strong>Market Structure Alignment</strong> evaluates structural sequences of Higher Highs (HH), Higher Lows (HL), Lower Highs (LH), and Lower Lows (LL).</p>
+            <div class="modal-badge-group">
+                <span class="modal-badge badge-buy">BUY Signal</span> Bullish structure confirmed via consecutive Higher Highs & Higher Lows.
+            </div>
+            <div class="modal-badge-group">
+                <span class="modal-badge badge-sell">SELL Signal</span> Bearish structure confirmed via consecutive Lower Highs & Lower Lows.
+            </div>
+        `
+    },
+    ind_swing: {
+        title: "Swing Support & Resistance Levels",
+        html: `
+            <p><strong>Swing Levels</strong> detect key historical price points where buying interest (Support) or selling pressure (Resistance) previously triggered reversals.</p>
+            <div class="modal-badge-group">
+                <span class="modal-badge badge-buy">BUY Signal</span> Price retests Support floor with bullish rejection.
+            </div>
+            <div class="modal-badge-group">
+                <span class="modal-badge badge-sell">SELL Signal</span> Price retests Resistance ceiling with bearish rejection.
+            </div>
+        `
+    },
+    // Matrix Column Explanations
+    col_indicator: {
+        title: "Column Definition: INDICATOR",
+        html: `
+            <p>The specific technical analysis indicator or structural algorithm evaluated across active price history.</p>
+            <p>Clicking any indicator name or info icon displays its exact calculation rules, mathematical formulas, and signal thresholds.</p>
+        `
+    },
+    col_signal: {
+        title: "Column Definition: SIGNAL",
+        html: `
+            <p>The directional bias output generated by evaluating the metric against current price action:</p>
+            <ul>
+                <li><strong style="color: #05ffc5;">BUY:</strong> Bullish convergence condition met.</li>
+                <li><strong style="color: #ff3b30;">SELL:</strong> Bearish convergence condition met.</li>
+                <li><strong style="color: #00f0ff;">NEUTRAL:</strong> Inconclusive range or mixed indicator values.</li>
+            </ul>
+        `
+    },
+    col_value: {
+        title: "Column Definition: VALUE",
+        html: `
+            <p>The exact raw mathematical numerical result computed for the indicator on the latest closed candle bar.</p>
+        `
+    },
+    col_reliability: {
+        title: "Column Definition: DYNAMIC RELIABILITY",
+        html: `
+            <p><strong>Dynamic Reliability</strong> represents the statistical win-rate accuracy of this specific indicator in the current market regime.</p>
+            <p>The engine continuously logs performance outcomes in SQLite. High-reliability indicators carry greater statistical weight when computing final confidence percentages.</p>
         `
     }
 };
@@ -210,18 +329,26 @@ async function fetchActiveTargets() {
         if (response.ok) {
             const targets = await response.json();
             const symSelect = document.getElementById("symbol-select");
-            const currentVal = symSelect.value;
             
-            symSelect.innerHTML = "";
-            const uniqueSymbols = [...new Set(targets.map(t => t.symbol))];
-            uniqueSymbols.forEach(symbol => {
-                const opt = document.createElement("option");
-                opt.value = symbol;
-                opt.textContent = symbol;
-                symSelect.appendChild(opt);
-            });
-            if (uniqueSymbols.includes(currentVal)) {
-                symSelect.value = currentVal;
+            // Get all existing option values in dropdown
+            const existingValues = Array.from(symSelect.querySelectorAll("option")).map(opt => opt.value);
+            const serverSymbols = [...new Set(targets.map(t => t.symbol))];
+            
+            // Find custom symbols not yet in the select
+            const customSymbols = serverSymbols.filter(s => !existingValues.includes(s));
+            if (customSymbols.length > 0) {
+                let customGroup = symSelect.querySelector("optgroup[label='Custom Markets']");
+                if (!customGroup) {
+                    customGroup = document.createElement("optgroup");
+                    customGroup.label = "Custom Markets";
+                    symSelect.appendChild(customGroup);
+                }
+                customSymbols.forEach(sym => {
+                    const opt = document.createElement("option");
+                    opt.value = sym;
+                    opt.textContent = sym;
+                    customGroup.appendChild(opt);
+                });
             }
         }
     } catch (err) {
@@ -320,12 +447,14 @@ function initModalHandlers() {
         modal.classList.remove("active");
     }
 
-    document.querySelectorAll(".info-trigger").forEach(btn => {
-        btn.addEventListener("click", (e) => {
+    // Event delegation for static and dynamically created info triggers
+    document.addEventListener("click", (e) => {
+        const trigger = e.target.closest(".info-trigger");
+        if (trigger) {
             e.stopPropagation();
-            const topic = btn.getAttribute("data-topic");
+            const topic = trigger.getAttribute("data-topic");
             openModal(topic);
-        });
+        }
     });
 
     if (guideBtn) {
@@ -424,6 +553,16 @@ function updateUI(data) {
     const tbody = document.getElementById("indicators-body");
     tbody.innerHTML = "";
 
+    const keyTopicMap = {
+        "SMA_20_50": "ind_sma",
+        "EMA_20_50": "ind_ema",
+        "RSI": "ind_rsi",
+        "MACD": "ind_macd",
+        "ATR": "ind_atr",
+        "Market_Structure": "ind_structure",
+        "Swing_Levels": "ind_swing"
+    };
+
     Object.keys(data.indicator_signals).forEach(key => {
         const sig = data.indicator_signals[key];
         const row = document.createElement("tr");
@@ -434,9 +573,14 @@ function updateUI(data) {
 
         let displayVal = sig.value.toFixed(2);
         if (key === "Market_Structure") displayVal = "Aligned";
+        
+        const topicKey = keyTopicMap[key] || "system";
 
         row.innerHTML = `
-            <td><strong>${sig.name.replace("_", " ")}</strong></td>
+            <td>
+                <button class="table-info-btn info-trigger" data-topic="${topicKey}" title="View indicator formula & breakdown">ⓘ</button>
+                <strong class="indicator-name-link info-trigger" data-topic="${topicKey}">${sig.name.replace(/_/g, " ")}</strong>
+            </td>
             <td><span class="sig-badge ${sigClass}">${sig.signal}</span></td>
             <td><code>${displayVal}</code></td>
             <td style="font-weight: 800; color: var(--color-cyan);">${Math.round(sig.confidence * 100)}%</td>

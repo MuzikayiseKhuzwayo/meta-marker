@@ -62,6 +62,35 @@ class Database:
                     PRIMARY KEY (symbol, timeframe, time)
                 )
             """)
+            
+            # Create monitored_markets table
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS monitored_markets (
+                    symbol TEXT NOT NULL,
+                    timeframe TEXT NOT NULL,
+                    added_at TEXT NOT NULL,
+                    is_active INTEGER DEFAULT 1,
+                    PRIMARY KEY (symbol, timeframe)
+                )
+            """)
+            
+            # Seed default famous markets if empty
+            cursor.execute("SELECT COUNT(*) FROM monitored_markets")
+            if cursor.fetchone()[0] == 0:
+                defaults = [
+                    ("XAUUSD", "M15"),
+                    ("EURUSD", "M15"),
+                    ("GBPUSD", "M15"),
+                    ("BTCUSD", "M15"),
+                    ("NAS100", "M15")
+                ]
+                now_str = datetime.utcnow().isoformat()
+                for sym, tf in defaults:
+                    cursor.execute("""
+                        INSERT OR IGNORE INTO monitored_markets (symbol, timeframe, added_at, is_active)
+                        VALUES (?, ?, ?, 1)
+                    """, (sym, tf, now_str))
+
             conn.commit()
 
     def save_candle(self, candle: Candle):
@@ -184,4 +213,30 @@ class Database:
                 INSERT OR REPLACE INTO indicator_scores (indicator_name, regime, score, num_predictions, num_correct)
                 VALUES (?, ?, ?, ?, ?)
             """, (indicator_name, regime, new_score, num_preds, num_corr))
+            conn.commit()
+
+    def add_monitored_market(self, symbol: str, timeframe: str):
+        symbol = symbol.upper()
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT OR REPLACE INTO monitored_markets (symbol, timeframe, added_at, is_active)
+                VALUES (?, ?, ?, 1)
+            """, (symbol, timeframe, datetime.utcnow().isoformat()))
+            conn.commit()
+
+    def get_monitored_markets(self) -> List[Dict[str, str]]:
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT symbol, timeframe FROM monitored_markets WHERE is_active = 1")
+            rows = cursor.fetchall()
+            return [{"symbol": row[0], "timeframe": row[1]} for row in rows]
+
+    def remove_monitored_market(self, symbol: str, timeframe: str):
+        symbol = symbol.upper()
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE monitored_markets SET is_active = 0 WHERE symbol = ? AND timeframe = ?
+            """, (symbol, timeframe))
             conn.commit()

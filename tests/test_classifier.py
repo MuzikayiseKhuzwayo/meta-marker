@@ -45,3 +45,24 @@ def test_database_multi_symbol_timeframe():
     # Query BTCUSD M15 (should be empty)
     res3 = db.get_candles(symbol="BTCUSD", timeframe="M15")
     assert len(res3) == 0
+
+def test_database_monitored_markets_persistence():
+    db = Database(":memory:")
+    
+    # Default seeded markets on init
+    markets = db.get_monitored_markets()
+    symbols = [m["symbol"] for m in markets]
+    assert "XAUUSD" in symbols
+    assert "EURUSD" in symbols
+    
+    # Add new market
+    db.add_monitored_market("USDJPY", "H1")
+    updated = db.get_monitored_markets()
+    pairs = [(m["symbol"], m["timeframe"]) for m in updated]
+    assert ("USDJPY", "H1") in pairs
+    
+    # Remove market
+    db.remove_monitored_market("USDJPY", "H1")
+    after_remove = db.get_monitored_markets()
+    after_pairs = [(m["symbol"], m["timeframe"]) for m in after_remove]
+    assert ("USDJPY", "H1") not in after_pairs

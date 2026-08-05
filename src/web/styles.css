@@ -378,12 +378,75 @@ body {
     letter-spacing: 1px;
     padding: 8px 6px;
     border-bottom: 1px solid var(--border-color);
-    cursor: help;
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+.indicator-table th:hover {
+    color: var(--color-cyan);
 }
 
 .indicator-table td {
     padding: 10px 6px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.02);
+}
+
+.table-info-btn {
+    background: transparent;
+    border: none;
+    color: var(--color-cyan);
+    font-weight: bold;
+    cursor: pointer;
+    margin-right: 4px;
+    font-size: 13px;
+    transition: transform 0.2s;
+}
+
+.table-info-btn:hover {
+    transform: scale(1.2);
+}
+
+.indicator-name-link {
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+.indicator-name-link:hover {
+    color: var(--color-cyan);
+    text-decoration: underline;
+}
+
+.modal-badge-group {
+    margin: 10px 0;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.modal-badge {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 800;
+    margin-right: 8px;
+}
+
+.badge-buy {
+    background: rgba(5, 255, 197, 0.15);
+    color: var(--color-green);
+    border: 1px solid rgba(5, 255, 197, 0.3);
+}
+
+.badge-sell {
+    background: rgba(255, 59, 48, 0.15);
+    color: var(--color-red);
+    border: 1px solid rgba(255, 59, 48, 0.3);
+}
+
+.badge-neutral {
+    background: rgba(0, 240, 255, 0.15);
+    color: var(--color-cyan);
+    border: 1px solid rgba(0, 240, 255, 0.3);
 }
 
 .indicator-table tbody tr:last-child td {

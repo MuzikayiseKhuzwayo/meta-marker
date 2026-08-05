@@ -37,8 +37,12 @@ class MT5SyncWorker:
         self.classifier = classifier
         self.is_running = False
         
-        # Monitor targets: Set of (symbol, timeframe_str)
-        self.targets: Set[Tuple[str, str]] = {("XAUUSD", "M15")}
+        # Monitor targets loaded from database persistence
+        db_targets = self.db.get_monitored_markets()
+        if db_targets:
+            self.targets: Set[Tuple[str, str]] = {(t["symbol"], t["timeframe"]) for t in db_targets}
+        else:
+            self.targets: Set[Tuple[str, str]] = {("XAUUSD", "M15")}
         
         # State caches keyed by (symbol, timeframe_str)
         self.previous_signals_map: Dict[Tuple[str, str], Dict[str, Any]] = {}
@@ -56,12 +60,14 @@ class MT5SyncWorker:
         # Normalize symbol name (e.g. upper case)
         symbol = symbol.upper()
         self.targets.add((symbol, timeframe))
+        self.db.add_monitored_market(symbol, timeframe)
         logger.info(f"Added monitoring target: {symbol} on {timeframe}")
         return True
 
     def remove_target(self, symbol: str, timeframe: str):
         symbol = symbol.upper()
         self.targets.discard((symbol, timeframe))
+        self.db.remove_monitored_market(symbol, timeframe)
         logger.info(f"Removed monitoring target: {symbol} on {timeframe}")
 
     def get_targets(self) -> List[Dict[str, str]]:

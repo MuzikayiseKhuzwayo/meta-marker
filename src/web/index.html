@@ -21,7 +21,38 @@
             <div class="header-right">
                 <div class="selector-group">
                     <select id="symbol-select" class="dashboard-select">
-                        <option value="XAUUSD">XAUUSD</option>
+                        <optgroup label="Forex Majors">
+                            <option value="XAUUSD" selected>XAUUSD (Gold)</option>
+                            <option value="EURUSD">EURUSD (Euro)</option>
+                            <option value="GBPUSD">GBPUSD (Pound)</option>
+                            <option value="USDJPY">USDJPY (Yen)</option>
+                            <option value="AUDUSD">AUDUSD (Aussie)</option>
+                            <option value="USDCAD">USDCAD (Loonie)</option>
+                            <option value="USDCHF">USDCHF (Swissie)</option>
+                            <option value="NZDUSD">NZDUSD (Kiwi)</option>
+                        </optgroup>
+                        <optgroup label="Forex Crosses">
+                            <option value="EURGBP">EURGBP</option>
+                            <option value="EURJPY">EURJPY</option>
+                            <option value="GBPJPY">GBPJPY</option>
+                            <option value="AUDCAD">AUDCAD</option>
+                            <option value="EURAUD">EURAUD</option>
+                        </optgroup>
+                        <optgroup label="Commodities & Metals">
+                            <option value="XAGUSD">XAGUSD (Silver)</option>
+                            <option value="USOIL">USOIL (Crude Oil)</option>
+                        </optgroup>
+                        <optgroup label="Indices">
+                            <option value="US30">US30 (Dow Jones)</option>
+                            <option value="NAS100">NAS100 (Nasdaq)</option>
+                            <option value="SPX500">SPX500 (S&P 500)</option>
+                            <option value="GER40">GER40 (DAX 40)</option>
+                        </optgroup>
+                        <optgroup label="Cryptocurrencies">
+                            <option value="BTCUSD">BTCUSD (Bitcoin)</option>
+                            <option value="ETHUSD">ETHUSD (Ethereum)</option>
+                            <option value="SOLUSD">SOLUSD (Solana)</option>
+                        </optgroup>
                     </select>
                     <select id="timeframe-select" class="dashboard-select">
                         <option value="M5">M5</option>
@@ -133,11 +164,10 @@
                     <table class="indicator-table">
                         <thead>
                             <tr>
-                                <th data-tooltip="The individual mechanical metric evaluated.">INDICATOR</th>
-                                <th data-tooltip="The directional bias output from this metric.">SIGNAL</th>
-                                <th data-tooltip="The exact mathematical output value.">VALUE</th>
-                                <th data-tooltip="Reliability score auto-weighted based on recent historical success.">
-                                    DYNAMIC RELIABILITY</th>
+                                <th class="info-trigger" data-topic="col_indicator" data-tooltip="Click for detailed breakdown">INDICATOR ⓘ</th>
+                                <th class="info-trigger" data-topic="col_signal" data-tooltip="Click for detailed breakdown">SIGNAL ⓘ</th>
+                                <th class="info-trigger" data-topic="col_value" data-tooltip="Click for detailed breakdown">VALUE ⓘ</th>
+                                <th class="info-trigger" data-topic="col_reliability" data-tooltip="Click for detailed breakdown">DYNAMIC RELIABILITY ⓘ</th>
                             </tr>
                         </thead>
                         <tbody id="indicators-body">
