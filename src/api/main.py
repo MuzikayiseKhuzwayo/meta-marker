@@ -130,6 +130,23 @@ async def remove_monitor_target(req: MonitorRequest):
 async def get_indicator_scores():
     return db.get_indicator_scores()
 
+@app.get("/api/predictions/history")
+async def get_predictions_history(symbol: Optional[str] = None, limit: int = 20):
+    """
+    Retrieve real-time prediction resolution audit history and win-rate resolution stats.
+    """
+    history = db.get_recent_predictions(symbol=symbol, limit=limit)
+    total = len(history)
+    resolved = [p for p in history if p["status"] in ("SUCCESS_TP", "FAIL_SL")]
+    wins = [p for p in resolved if p["status"] == "SUCCESS_TP"]
+    win_rate = (len(wins) / len(resolved) * 100.0) if resolved else 0.0
+    return {
+        "total_audited": total,
+        "resolved_count": len(resolved),
+        "win_rate": round(win_rate, 1),
+        "predictions": history
+    }
+
 # WebSocket Endpoint
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):

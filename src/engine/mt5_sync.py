@@ -225,6 +225,58 @@ class MT5SyncWorker:
                         classification_res = self.classifier.classify(history)
                         self.db.save_classification(latest_time, classification_res.classification, symbol=symbol, timeframe=tf_str)
                         
+                        # 5. Evaluate and resolve pending predictions against latest price action
+                        pending = self.db.get_pending_predictions(symbol, tf_str)
+                        latest_candle = history[-1]
+                        for p in pending:
+                            p_id = p["id"]
+                            tp = p["take_profit"]
+                            sl = p["stop_loss"]
+                            rec = p["recommendation"]
+                            regime = p["primary_regime"]
+                            sigs = p["indicator_signals"]
+                            
+                            resolved_status = None
+                            if "BUY" in rec and tp and sl:
+                                if latest_candle.high >= tp:
+                                    resolved_status = "SUCCESS_TP"
+                                elif latest_candle.low <= sl:
+                                    resolved_status = "FAIL_SL"
+                            elif "SELL" in rec and tp and sl:
+                                if latest_candle.low <= tp:
+                                    resolved_status = "SUCCESS_TP"
+                                elif latest_candle.high >= sl:
+                                    resolved_status = "FAIL_SL"
+                                    
+                            if resolved_status:
+                                self.db.resolve_prediction(p_id, resolved_status, latest_candle.close)
+                                is_win = (resolved_status == "SUCCESS_TP")
+                                for ind_name, sig_info in sigs.items():
+                                    sig = sig_info.get("signal")
+                                    ind_correct = (is_win and (("BUY" in rec and sig == "BUY") or ("SELL" in rec and sig == "SELL")))
+                                    self.db.update_indicator_score(ind_name, regime, ind_correct)
+                                logger.info(f"Resolved Prediction #{p_id} for {symbol} ({tf_str}): {resolved_status}. Dynamic Reliability scores updated in SQLite!")
+
+                        # Save new prediction log on new candle close if signal active
+                        if last_processed and latest_time > last_processed:
+                            if classification_res.trade_setup or classification_res.confidence_buy > 60 or classification_res.confidence_sell > 60:
+                                entry = history[-1].close
+                                sl = classification_res.trade_setup.stop_loss if classification_res.trade_setup else None
+                                tp = classification_res.trade_setup.take_profit if classification_res.trade_setup else None
+                                sigs_dict = {k: {"signal": v.signal, "confidence": v.confidence} for k, v in classification_res.indicator_signals.items()}
+                                self.db.save_prediction(
+                                    symbol=symbol,
+                                    timeframe=tf_str,
+                                    primary_regime=classification_res.classification.primary_regime,
+                                    recommendation=classification_res.recommendation,
+                                    buy_conf=classification_res.confidence_buy,
+                                    sell_conf=classification_res.confidence_sell,
+                                    entry_price=entry,
+                                    stop_loss=sl,
+                                    take_profit=tp,
+                                    indicator_signals=sigs_dict
+                                )
+
                         # Cache current signals for next loop iteration
                         self.previous_signals_map[(symbol, tf_str)] = {
                             k: v.model_copy() for k, v in classification_res.indicator_signals.items()

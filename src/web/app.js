@@ -83,16 +83,29 @@ const TOPIC_EXPLANATIONS = {
         `
     },
     ind_ema: {
-        title: "EMA (Exponential Moving Average 20 / 50)",
+        title: "EMA Cross (Exponential Moving Average 20 vs 50)",
         html: `
-            <p><strong>Exponential Moving Average (EMA)</strong> applies exponentially higher weighting to recent price bars, providing earlier trend bias identification with reduced lag.</p>
+            <p><strong>EMA Cross</strong> measures short-term price momentum against medium-term trend bias by calculating the delta between the 20-period EMA and the 50-period EMA.</p>
             <div class="modal-badge-group">
-                <span class="modal-badge badge-buy">BUY Signal</span> Price > EMA 20 AND EMA 20 > EMA 50 (Bullish Momentum Stack).
+                <span class="modal-badge badge-buy">BUY Signal</span> EMA 20 > EMA 50 (Positive Delta). Short-term momentum is above medium-term trend bias.
             </div>
             <div class="modal-badge-group">
-                <span class="modal-badge badge-sell">SELL Signal</span> Price < EMA 20 AND EMA 20 < EMA 50 (Bearish Momentum Stack).
+                <span class="modal-badge badge-sell">SELL Signal</span> EMA 20 < EMA 50 (Negative Delta). Short-term momentum is below medium-term trend bias.
             </div>
-            <p style="margin-top: 10px;"><strong>Formula:</strong> <code>EMA = (Close * K) + (Prev_EMA * (1 - K))</code> where <code>K = 2 / (Period + 1)</code></p>
+            <p style="margin-top: 10px;"><strong>Value Field:</strong> Displays the raw price spread <code>(EMA_20 - EMA_50)</code>.</p>
+        `
+    },
+    ind_stoch: {
+        title: "Stochastic Oscillator (%K 14, %D 3)",
+        html: `
+            <p><strong>Stochastic Oscillator</strong> compares a security's closing price to its high-low price range over a 14-period window, pinpointing overbought and oversold momentum turning points.</p>
+            <div class="modal-badge-group">
+                <span class="modal-badge badge-buy">BUY Signal</span> %K line < 20 (Oversold condition) AND crosses above the %D signal line.
+            </div>
+            <div class="modal-badge-group">
+                <span class="modal-badge badge-sell">SELL Signal</span> %K line > 80 (Overbought condition) AND crosses below the %D signal line.
+            </div>
+            <p style="margin-top: 10px;"><strong>Value Field:</strong> Current %K value bounded between 0 and 100.</p>
         `
     },
     ind_rsi: {
@@ -100,10 +113,10 @@ const TOPIC_EXPLANATIONS = {
         html: `
             <p><strong>Relative Strength Index (RSI)</strong> measures speed and momentum of price movements on a scale of 0 to 100.</p>
             <div class="modal-badge-group">
-                <span class="modal-badge badge-buy">BUY Signal</span> RSI < 35 (Oversold reversal) OR bullish crossover above centerline 50.
+                <span class="modal-badge badge-buy">BUY Signal</span> RSI < 30 (Oversold reversal) OR bullish crossover above centerline 50.
             </div>
             <div class="modal-badge-group">
-                <span class="modal-badge badge-sell">SELL Signal</span> RSI > 65 (Overbought reversal) OR bearish crossover below centerline 50.
+                <span class="modal-badge badge-sell">SELL Signal</span> RSI > 70 (Overbought reversal) OR bearish crossover below centerline 50.
             </div>
             <p style="margin-top: 10px;"><strong>Formula:</strong> <code>RSI = 100 - (100 / (1 + RS))</code> where <code>RS = Avg Gain / Avg Loss</code></p>
         `
@@ -182,8 +195,13 @@ const TOPIC_EXPLANATIONS = {
     col_reliability: {
         title: "Column Definition: DYNAMIC RELIABILITY",
         html: `
-            <p><strong>Dynamic Reliability</strong> represents the statistical win-rate accuracy of this specific indicator in the current market regime.</p>
-            <p>The engine continuously logs performance outcomes in SQLite. High-reliability indicators carry greater statistical weight when computing final confidence percentages.</p>
+            <p><strong>Dynamic Reliability</strong> represents the empirical win-rate accuracy of this specific indicator in the active market regime.</p>
+            <p><strong>Real-Time Resolution Engine:</strong></p>
+            <ul>
+                <li>Every recommendation generated is saved to an internal SQLite <code>prediction_audit</code> table with timestamps, entry price, Stop Loss, Take Profit, and initial indicator signals.</li>
+                <li>As new market candles ingest from MT5, pending predictions are evaluated against live price highs and lows.</li>
+                <li>When Take Profit or Stop Loss is reached, the prediction resolves (<code>SUCCESS_TP</code> or <code>FAIL_SL</code>), and the win-rate score for each contributing indicator is updated in SQLite.</li>
+            </ul>
         `
     }
 };
@@ -554,12 +572,14 @@ function updateUI(data) {
     tbody.innerHTML = "";
 
     const keyTopicMap = {
-        "SMA_20_50": "ind_sma",
+        "EMA_Cross": "ind_ema",
         "EMA_20_50": "ind_ema",
         "RSI": "ind_rsi",
         "MACD": "ind_macd",
-        "ATR": "ind_atr",
+        "Stochastic": "ind_stoch",
         "Market_Structure": "ind_structure",
+        "SMA_20_50": "ind_sma",
+        "ATR": "ind_atr",
         "Swing_Levels": "ind_swing"
     };
 

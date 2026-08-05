@@ -66,3 +66,37 @@ def test_database_monitored_markets_persistence():
     after_remove = db.get_monitored_markets()
     after_pairs = [(m["symbol"], m["timeframe"]) for m in after_remove]
     assert ("USDJPY", "H1") not in after_pairs
+
+def test_prediction_audit_resolution():
+    db = Database(":memory:")
+    
+    # Save a test prediction
+    pred_id = db.save_prediction(
+        symbol="XAUUSD",
+        timeframe="M15",
+        primary_regime="BULLISH_TREND",
+        recommendation="★ MAX CONFIDENCE SETUP ★ STRONG BUY",
+        buy_conf=95.0,
+        sell_conf=5.0,
+        entry_price=2000.0,
+        stop_loss=1990.0,
+        take_profit=2020.0,
+        indicator_signals={"EMA_Cross": {"signal": "BUY", "confidence": 0.9}}
+    )
+    assert pred_id > 0
+    
+    pending = db.get_pending_predictions("XAUUSD", "M15")
+    assert len(pending) == 1
+    assert pending[0]["id"] == pred_id
+    assert pending[0]["status"] == "PENDING"
+    
+    # Resolve prediction as SUCCESS_TP
+    db.resolve_prediction(pred_id, "SUCCESS_TP", 2021.0)
+    
+    pending_after = db.get_pending_predictions("XAUUSD", "M15")
+    assert len(pending_after) == 0
+    
+    recent = db.get_recent_predictions("XAUUSD")
+    assert len(recent) == 1
+    assert recent[0]["status"] == "SUCCESS_TP"
+    assert recent[0]["resolved_price"] == 2021.0
