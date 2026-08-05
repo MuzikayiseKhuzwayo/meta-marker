@@ -113,6 +113,11 @@ class MT5SyncWorker:
                 for symbol, tf_str in active_targets:
                     tf_const = TIMEFRAME_MAP[tf_str]
                     
+                    # Ensure symbol is active in MT5 Market Watch
+                    if not mt5.symbol_select(symbol, True):
+                        logger.error(f"Failed to select/activate symbol {symbol} in MT5 terminal.")
+                        continue
+                        
                     # Fetch rates (copy latest 1000 bars)
                     rates = mt5.copy_rates_from_pos(symbol, tf_const, 0, 1000)
                     if rates is None or len(rates) == 0:

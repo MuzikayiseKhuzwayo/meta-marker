@@ -147,7 +147,7 @@ function setupChartInteractions() {
             const maxScroll = Math.max(0, historyLength - visibleCandleCount);
             
             // Adjust scrollIndex (panning left adds to index, panning right subtracts)
-            scrollIndex = Math.max(0, Math.min(maxScroll, scrollIndex + indexShift));
+            scrollIndex = Math.max(0, Math.min(maxScroll, scrollIndex - indexShift));
             dragStartX = clientX; // Anchor to new drag position for smoother tracking
             drawChart(chartData);
         }
@@ -330,6 +330,12 @@ function displayWaitingState() {
             <p style="margin-top: 8px; color: var(--text-secondary);">Ensure your MetaTrader 5 terminal is connected, DLL imports are enabled, and the sync target is active.</p>
         </div>
     `;
+    
+    // Clear indicator matrix table
+    const tbody = document.getElementById("indicators-body");
+    if (tbody) {
+        tbody.innerHTML = `<tr><td colspan="4" class="empty-state">No indicator data loaded. Waiting for ingestion...</td></tr>`;
+    }
     
     const canvas = document.getElementById("price-chart");
     if (canvas) {
