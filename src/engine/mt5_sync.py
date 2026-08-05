@@ -67,6 +67,62 @@ class MT5SyncWorker:
     def get_targets(self) -> List[Dict[str, str]]:
         return [{"symbol": t[0], "timeframe": t[1]} for t in self.targets]
 
+    async def sync_single_target(self, symbol: str, tf_str: str):
+        if tf_str not in TIMEFRAME_MAP:
+            return
+        tf_const = TIMEFRAME_MAP[tf_str]
+        symbol = symbol.upper()
+        
+        # Initialize MT5 if needed
+        init_success = False
+        if self.login_id and self.password and self.server:
+            init_success = mt5.initialize(
+                login=int(self.login_id),
+                password=self.password,
+                server=self.server
+            )
+        else:
+            init_success = mt5.initialize()
+
+        if not init_success:
+            logger.error(f"MT5 initialization failed in sync_single_target: {mt5.last_error()}")
+            return
+            
+        if not mt5.symbol_select(symbol, True):
+            logger.error(f"Failed to select symbol {symbol} in MT5 terminal.")
+            return
+
+        rates = mt5.copy_rates_from_pos(symbol, tf_const, 0, 1000)
+        if rates is None or len(rates) == 0:
+            logger.error(f"Failed to copy rates for {symbol} on {tf_str}. Error: {mt5.last_error()}")
+            return
+
+        synced_candles: List[Candle] = []
+        for rate in rates:
+            dt = datetime.fromtimestamp(int(rate['time']), tz=timezone.utc)
+            candle = Candle(
+                time=dt,
+                open=float(rate['open']),
+                high=float(rate['high']),
+                low=float(rate['low']),
+                close=float(rate['close']),
+                volume=float(rate['tick_volume']),
+                symbol=symbol,
+                timeframe=tf_str
+            )
+            synced_candles.append(candle)
+            
+        for c in synced_candles:
+            self.db.save_candle(c)
+
+        history = self.db.get_candles(symbol=symbol, timeframe=tf_str, limit=1000)
+        if len(history) >= 2:
+            latest_time = history[-1].time
+            classification_res = self.classifier.classify(history)
+            self.db.save_classification(latest_time, classification_res.classification, symbol=symbol, timeframe=tf_str)
+            self.last_processed_times[(symbol, tf_str)] = latest_time
+            logger.info(f"On-demand sync complete for {symbol} ({tf_str}). Ingested {len(history)} bars.")
+
     async def start(self):
         self.is_running = True
         logger.info("Starting MT5 Direct Integration Sync worker...")
@@ -81,7 +137,7 @@ class MT5SyncWorker:
                 except Exception:
                     pass
 
-        asyncio.create_task(self.sync_loop())
+        self.sync_task = asyncio.create_task(self.sync_loop())
 
     async def stop(self):
         self.is_running = False

@@ -93,11 +93,19 @@ async def get_broker_symbols():
 @app.get("/api/state", response_model=MarketStateResponse)
 async def get_current_state(symbol: str = "XAUUSD", timeframe: str = "M15"):
     symbol = symbol.upper()
+    # Auto-register target in background sync worker
+    sync_worker.add_target(symbol, timeframe)
+    
     history = db.get_candles(symbol=symbol, timeframe=timeframe, limit=1000)
     if not history:
-        raise HTTPException(status_code=404, detail=f"No market data ingested for {symbol} ({timeframe}) yet.")
+        # Perform on-demand single-pass sync so the first request retrieves data immediately
+        await sync_worker.sync_single_target(symbol, timeframe)
+        history = db.get_candles(symbol=symbol, timeframe=timeframe, limit=1000)
+        
+    if not history:
+        raise HTTPException(status_code=404, detail=f"No market data ingested for {symbol} ({timeframe}) yet. Ensure symbol is available in broker MT5.")
+        
     res = classifier.classify(history)
-    # Ensure correct symbol/timeframe is explicitly stated in response
     res.symbol = symbol
     res.timeframe = timeframe
     return res
