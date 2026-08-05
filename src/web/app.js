@@ -481,10 +481,9 @@ function drawChart(data) {
     const history = data.history || [];
     if (history.length === 0) return;
 
-    // slice history based on user panning/scrolling
-    // latest items are at the end, so we slice relative to scrollIndex
-    const startIdx = Math.max(0, history.length - visibleCandleCount - scrollIndex);
+    // Slice history to only show the viewport window (visibleCandleCount) based on scrollIndex
     const endIdx = Math.max(visibleCandleCount, history.length - scrollIndex);
+    const startIdx = Math.max(0, endIdx - visibleCandleCount);
     const visibleHistory = history.slice(startIdx, endIdx);
     
     if (visibleHistory.length === 0) return;
@@ -656,17 +655,17 @@ function drawChart(data) {
         const bodyY = Math.min(yOpen, yClose);
         ctx.fillRect(bodyX, bodyY, bodyWidth, bodyHeight);
 
-        // Draw Time labels on X-axis (offset based on viewport mapping)
-        if (idx % 8 === 0) {
-            ctx.fillStyle = "#ffffff"; // Brighter white for time labels
-            ctx.font = "9px Outfit, sans-serif";
+        // Draw Time labels on X-axis (spaced every 6 candles for clean layout)
+        if (idx % 6 === 0) {
+            ctx.fillStyle = "#ffffff";
+            ctx.font = "bold 9px Outfit, sans-serif";
             ctx.textAlign = "center";
             ctx.textBaseline = "top";
             try {
                 const date = new Date(candle.time);
                 const hrs = String(date.getUTCHours()).padStart(2, '0');
                 const mins = String(date.getUTCMinutes()).padStart(2, '0');
-                ctx.fillText(`${hrs}:${mins}`, x, paddingBottom + chartHeight + 4);
+                ctx.fillText(`${hrs}:${mins}`, x, paddingBottom + chartHeight + 6);
             } catch (e) {}
         }
     });
