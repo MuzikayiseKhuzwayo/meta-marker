@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-from typing import List, Dict, Any, Set
+from typing import List, Dict, Any, Set, Optional
 import os
 import MetaTrader5 as mt5
 from contextlib import asynccontextmanager
