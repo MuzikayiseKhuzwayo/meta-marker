@@ -14,6 +14,7 @@ let chartData = null;
 let isDragging = false;
 let dragStartX = 0;
 let scrollIndex = 0; // Number of candles we have scrolled into the past (0 = show latest)
+let dragAccumulator = 0; // Floating point drag pixel accumulator
 const visibleCandleCount = 45; // Fixed number of candles displayed in the viewport
 
 // Definitions mapping for explanation Modals
@@ -123,7 +124,7 @@ function setupSelectors() {
     });
 }
 
-// Setup drag and swipe interactions on the canvas
+// Setup drag, swipe, and wheel interactions on the canvas
 function setupChartInteractions() {
     const canvas = document.getElementById("price-chart");
     if (!canvas) return;
@@ -131,6 +132,7 @@ function setupChartInteractions() {
     const startDrag = (clientX) => {
         isDragging = true;
         dragStartX = clientX;
+        dragAccumulator = -scrollIndex; // Initialize accumulator to current scroll index
         canvas.style.cursor = "grabbing";
     };
 
@@ -138,17 +140,22 @@ function setupChartInteractions() {
         if (!isDragging || !chartData || !chartData.history) return;
         
         const deltaX = clientX - dragStartX;
-        const widthPerCandle = canvas.width / visibleCandleCount;
+        dragStartX = clientX; // Always advance dragStartX continuously
         
-        // Convert pixel drag movement to candle count index offset
-        const indexShift = Math.round(deltaX / widthPerCandle);
-        if (indexShift !== 0) {
-            const historyLength = chartData.history.length;
-            const maxScroll = Math.max(0, historyLength - visibleCandleCount);
-            
-            // Adjust scrollIndex (panning left adds to index, panning right subtracts)
-            scrollIndex = Math.max(0, Math.min(maxScroll, scrollIndex - indexShift));
-            dragStartX = clientX; // Anchor to new drag position for smoother tracking
+        const rectWidth = canvas.width || 800;
+        const widthPerCandle = (rectWidth - 70) / visibleCandleCount;
+        if (widthPerCandle <= 0) return;
+        
+        // Dragging left (deltaX < 0) means looking into past -> increase scrollIndex
+        const candlesMoved = deltaX / widthPerCandle;
+        dragAccumulator -= candlesMoved;
+        
+        const historyLength = chartData.history.length;
+        const maxScroll = Math.max(0, historyLength - visibleCandleCount);
+        
+        const newScrollIndex = Math.max(0, Math.min(maxScroll, Math.round(dragAccumulator)));
+        if (newScrollIndex !== scrollIndex) {
+            scrollIndex = newScrollIndex;
             drawChart(chartData);
         }
     };
@@ -158,13 +165,13 @@ function setupChartInteractions() {
         canvas.style.cursor = "crosshair";
     };
 
-    // Mouse events
+    // Mouse drag events
     canvas.addEventListener("mousedown", (e) => startDrag(e.clientX));
     canvas.addEventListener("mousemove", (e) => moveDrag(e.clientX));
     window.addEventListener("mouseup", stopDrag);
     canvas.addEventListener("mouseleave", stopDrag);
 
-    // Touch events
+    // Touch swipe events
     canvas.addEventListener("touchstart", (e) => {
         if (e.touches.length === 1) startDrag(e.touches[0].clientX);
     }, { passive: true });
@@ -172,6 +179,24 @@ function setupChartInteractions() {
         if (e.touches.length === 1) moveDrag(e.touches[0].clientX);
     }, { passive: true });
     canvas.addEventListener("touchend", stopDrag);
+
+    // Wheel / Touchpad scroll events
+    canvas.addEventListener("wheel", (e) => {
+        if (!chartData || !chartData.history) return;
+        e.preventDefault();
+        
+        const historyLength = chartData.history.length;
+        const maxScroll = Math.max(0, historyLength - visibleCandleCount);
+        
+        // Scroll down / right = view past candles (+scrollIndex)
+        // Scroll up / left = view latest candles (-scrollIndex)
+        const direction = e.deltaY > 0 || e.deltaX > 0 ? 1 : -1;
+        const shift = Math.abs(e.deltaY) > 50 ? 3 : 1;
+        
+        scrollIndex = Math.max(0, Math.min(maxScroll, scrollIndex + direction * shift));
+        dragAccumulator = scrollIndex;
+        drawChart(chartData);
+    }, { passive: false });
 }
 
 function updateHeaderStatus() {
