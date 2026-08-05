@@ -269,6 +269,6 @@ class MarketClassifier:
             confidence_buy=confidence_buy,
             confidence_sell=confidence_sell,
             recommendation=recommendation,
-            history=candles[-40:],
+            history=candles[-300:],
             trade_setup=trade_setup
         )

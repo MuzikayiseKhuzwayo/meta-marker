@@ -1,4 +1,4 @@
-// Meta-Marker Front-End Dashboard logic with WebSockets & Advanced Chart Overlays
+// Meta-Marker Front-End Dashboard logic with WebSockets & Scrollable Chart Overlays
 
 document.addEventListener("DOMContentLoaded", () => {
     initDashboard();
@@ -9,6 +9,13 @@ let currentSymbol = "XAUUSD";
 let currentTimeframe = "M15";
 let wsConnection = null;
 
+// Global chart drag & pan state
+let chartData = null;
+let isDragging = false;
+let dragStartX = 0;
+let scrollIndex = 0; // Number of candles we have scrolled into the past (0 = show latest)
+const visibleCandleCount = 45; // Fixed number of candles displayed in the viewport
+
 // Definitions mapping for explanation Modals
 const TOPIC_EXPLANATIONS = {
     system: {
@@ -16,7 +23,7 @@ const TOPIC_EXPLANATIONS = {
         html: `
             <p>Welcome to the <strong>Meta-Marker Market Intelligence Dashboard</strong>.</p>
             <p>This analytics interface aggregates algorithmic telemetry, statistical classifications, and real-time technical indicators to provide concrete execution strategies across multiple symbols and timeframes.</p>
-            <p><strong>Visual Overlays:</strong> The chart draws dynamic SMA/EMA trend lines, structural Support & Resistance lines, and identifies local Swing Points in real-time.</p>
+            <p><strong>Interactive Pan/Scroll:</strong> Click and drag left/right on the chart canvas to scroll through historical price action.</p>
         `
     },
     classification: {
@@ -63,6 +70,7 @@ const TOPIC_EXPLANATIONS = {
 
 async function initDashboard() {
     setupSelectors();
+    setupChartInteractions();
     await fetchActiveTargets();
     await fetchBrokerSymbols();
     await fetchDashboardData();
@@ -78,12 +86,14 @@ function setupSelectors() {
 
     symSelect.addEventListener("change", (e) => {
         currentSymbol = e.target.value;
+        scrollIndex = 0; // Reset scroll on asset change
         updateHeaderStatus();
         fetchDashboardData();
     });
 
     tfSelect.addEventListener("change", (e) => {
         currentTimeframe = e.target.value;
+        scrollIndex = 0; // Reset scroll on timeframe change
         updateHeaderStatus();
         fetchDashboardData();
     });
@@ -102,6 +112,7 @@ function setupSelectors() {
                     await fetchActiveTargets();
                     symSelect.value = value;
                     currentSymbol = value;
+                    scrollIndex = 0;
                     updateHeaderStatus();
                     fetchDashboardData();
                 }
@@ -110,6 +121,57 @@ function setupSelectors() {
             }
         }
     });
+}
+
+// Setup drag and swipe interactions on the canvas
+function setupChartInteractions() {
+    const canvas = document.getElementById("price-chart");
+    if (!canvas) return;
+
+    const startDrag = (clientX) => {
+        isDragging = true;
+        dragStartX = clientX;
+        canvas.style.cursor = "grabbing";
+    };
+
+    const moveDrag = (clientX) => {
+        if (!isDragging || !chartData || !chartData.history) return;
+        
+        const deltaX = clientX - dragStartX;
+        const widthPerCandle = canvas.width / visibleCandleCount;
+        
+        // Convert pixel drag movement to candle count index offset
+        const indexShift = Math.round(deltaX / widthPerCandle);
+        if (indexShift !== 0) {
+            const historyLength = chartData.history.length;
+            const maxScroll = Math.max(0, historyLength - visibleCandleCount);
+            
+            // Adjust scrollIndex (panning left adds to index, panning right subtracts)
+            scrollIndex = Math.max(0, Math.min(maxScroll, scrollIndex + indexShift));
+            dragStartX = clientX; // Anchor to new drag position for smoother tracking
+            drawChart(chartData);
+        }
+    };
+
+    const stopDrag = () => {
+        isDragging = false;
+        canvas.style.cursor = "crosshair";
+    };
+
+    // Mouse events
+    canvas.addEventListener("mousedown", (e) => startDrag(e.clientX));
+    canvas.addEventListener("mousemove", (e) => moveDrag(e.clientX));
+    window.addEventListener("mouseup", stopDrag);
+    canvas.addEventListener("mouseleave", stopDrag);
+
+    // Touch events
+    canvas.addEventListener("touchstart", (e) => {
+        if (e.touches.length === 1) startDrag(e.touches[0].clientX);
+    }, { passive: true });
+    canvas.addEventListener("touchmove", (e) => {
+        if (e.touches.length === 1) moveDrag(e.touches[0].clientX);
+    }, { passive: true });
+    canvas.addEventListener("touchend", stopDrag);
 }
 
 function updateHeaderStatus() {
@@ -126,7 +188,6 @@ async function fetchActiveTargets() {
             const currentVal = symSelect.value;
             
             symSelect.innerHTML = "";
-            // Find unique symbols in targets
             const uniqueSymbols = [...new Set(targets.map(t => t.symbol))];
             uniqueSymbols.forEach(symbol => {
                 const opt = document.createElement("option");
@@ -149,7 +210,6 @@ async function fetchBrokerSymbols() {
         if (response.ok) {
             const allSymbols = await response.json();
             const addInput = document.getElementById("add-symbol-input");
-            // Set up basic datalist for autocompletion
             let datalist = document.getElementById("broker-symbols-datalist");
             if (!datalist) {
                 datalist = document.createElement("datalist");
@@ -175,6 +235,7 @@ async function fetchDashboardData() {
             return;
         }
         const data = await response.json();
+        chartData = data; // Cache data
         updateUI(data);
         drawChart(data);
     } catch (err) {
@@ -193,8 +254,8 @@ function connectWebSocket() {
     wsConnection.onmessage = (event) => {
         try {
             const payload = JSON.parse(event.data);
-            // Verify if payload belongs to current active target
             if (payload.symbol.toUpperCase() === currentSymbol.toUpperCase() && payload.timeframe === currentTimeframe) {
+                chartData = payload; // Update cached data
                 updateUI(payload);
                 drawChart(payload);
             }
@@ -204,7 +265,6 @@ function connectWebSocket() {
     };
 
     wsConnection.onclose = () => {
-        // Reconnect after 5 seconds
         setTimeout(connectWebSocket, 5000);
     };
 
@@ -271,7 +331,6 @@ function displayWaitingState() {
         </div>
     `;
     
-    // Clear chart canvas
     const canvas = document.getElementById("price-chart");
     if (canvas) {
         const ctx = canvas.getContext("2d");
@@ -372,7 +431,6 @@ function calculateEMA(prices, period) {
 function identifySwingLevels(history) {
     const supports = [];
     const resistances = [];
-    // Local window S/R: check surrounding 4 candles
     for (let i = 4; i < history.length - 4; i++) {
         const currentHigh = history[i].high;
         const currentLow = history[i].low;
@@ -388,8 +446,8 @@ function identifySwingLevels(history) {
         if (isLow) supports.push(currentLow);
     }
     return { 
-        supports: [...new Set(supports)].slice(-3), 
-        resistances: [...new Set(resistances)].slice(-3) 
+        supports: [...new Set(supports)].slice(-4), 
+        resistances: [...new Set(resistances)].slice(-4) 
     };
 }
 
@@ -407,9 +465,9 @@ function drawChart(data) {
     const height = canvas.height;
 
     const paddingLeft = 10;
-    const paddingRight = 60;
-    const paddingTop = 20;
-    const paddingBottom = 20;
+    const paddingRight = 60; // Space for price scale labels
+    const paddingTop = 25;
+    const paddingBottom = 25;
 
     const chartWidth = width - paddingLeft - paddingRight;
     const chartHeight = height - paddingTop - paddingBottom;
@@ -417,8 +475,23 @@ function drawChart(data) {
     const history = data.history || [];
     if (history.length === 0) return;
 
-    let minPrice = Math.min(...history.map(c => c.low));
-    let maxPrice = Math.max(...history.map(c => c.high));
+    // slice history based on user panning/scrolling
+    // latest items are at the end, so we slice relative to scrollIndex
+    const startIdx = Math.max(0, history.length - visibleCandleCount - scrollIndex);
+    const endIdx = Math.max(visibleCandleCount, history.length - scrollIndex);
+    const visibleHistory = history.slice(startIdx, endIdx);
+    
+    if (visibleHistory.length === 0) return;
+
+    // Find min and max prices within the visible window to scale y-axis
+    let minPrice = Math.min(...visibleHistory.map(c => c.low));
+    let maxPrice = Math.max(...visibleHistory.map(c => c.high));
+
+    // If trade setup is active, expand scale to include stop loss and take profit
+    if (data.trade_setup) {
+        minPrice = Math.min(minPrice, data.trade_setup.stop_loss, data.trade_setup.take_profit);
+        maxPrice = Math.max(maxPrice, data.trade_setup.stop_loss, data.trade_setup.take_profit);
+    }
 
     const priceRange = maxPrice - minPrice;
     const priceMargin = priceRange * 0.1 || 1.0;
@@ -429,59 +502,72 @@ function drawChart(data) {
         return chartHeight - ((price - minPrice) / (maxPrice - minPrice)) * chartHeight + paddingTop;
     };
 
-    // Draw background grid lines & Price Labels
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.03)";
-    ctx.lineWidth = 1;
-    ctx.fillStyle = "var(--text-secondary)";
-    ctx.font = "10px Outfit, sans-serif";
-    ctx.textAlign = "left";
-    ctx.textBaseline = "middle";
+    // Helper: Draw label text box with a solid background for readability
+    const drawTextBox = (text, x, y, color, alignment = "left") => {
+        ctx.font = "bold 10px Outfit, sans-serif";
+        ctx.textBaseline = "middle";
+        ctx.textAlign = alignment;
+        
+        const textWidth = ctx.measureText(text).width;
+        const boxWidth = textWidth + 8;
+        const boxHeight = 16;
+        
+        ctx.fillStyle = "rgba(10, 14, 23, 0.9)";
+        
+        let boxX = x;
+        if (alignment === "right") {
+            boxX = x - boxWidth;
+        } else if (alignment === "center") {
+            boxX = x - boxWidth / 2;
+        }
+        
+        ctx.fillRect(boxX, y - boxHeight / 2, boxWidth, boxHeight);
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 0.5;
+        ctx.strokeRect(boxX, y - boxHeight / 2, boxWidth, boxHeight);
+        
+        ctx.fillStyle = "#ffffff"; // Brighter white text for readability
+        ctx.fillText(text, alignment === "right" ? x - 4 : (alignment === "center" ? x : x + 4), y);
+    };
 
+    // Draw background grid lines & Price scale Labels
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.04)";
+    ctx.lineWidth = 1;
+    
     const gridLinesCount = 5;
     for (let i = 0; i < gridLinesCount; i++) {
         const ratio = i / (gridLinesCount - 1);
         const price = maxPrice - ratio * (maxPrice - minPrice);
         const y = scaleY(price);
+        
+        // Draw gridline
         ctx.beginPath();
         ctx.moveTo(paddingLeft, y);
         ctx.lineTo(paddingLeft + chartWidth, y);
         ctx.stroke();
-        ctx.fillText(price.toFixed(2), paddingLeft + chartWidth + 8, y);
+        
+        // Draw bright y-axis price scale label on the right
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "10px Outfit, sans-serif";
+        ctx.textAlign = "left";
+        ctx.textBaseline = "middle";
+        ctx.fillText(price.toFixed(2), paddingLeft + chartWidth + 6, y);
     }
 
-    const candleWidth = chartWidth / history.length;
+    const candleWidth = chartWidth / visibleHistory.length;
     const bodyPadding = Math.max(1, candleWidth * 0.2);
 
-    // Calculate indicator overlay vectors (EMA 20 & EMA 50)
-    const closes = history.map(c => c.close);
-    const ema20 = calculateEMA(closes, 20);
-    const ema50 = calculateEMA(closes, 50);
-    
-    // Calculate Swing Structure floors and ceilings
+    // Calculate indicator overlay lines on full history to keep EMA curves continuous
+    const allCloses = history.map(c => c.close);
+    const ema20 = calculateEMA(allCloses, 20);
+    const ema50 = calculateEMA(allCloses, 50);
     const structure = identifySwingLevels(history);
 
-    // 1. Draw Support and Resistance zones overlay (dashed indicator lines with labels)
+    // 1. Draw Support and Resistance zones overlay (dashed lines with clean labels)
     ctx.lineWidth = 1;
-    ctx.font = "9px Outfit, sans-serif";
-    ctx.textAlign = "left";
-    
     structure.supports.forEach(level => {
         const y = scaleY(level);
-        ctx.strokeStyle = "rgba(5, 255, 197, 0.35)"; // green dashed support
-        ctx.setLineDash([4, 4]);
-        ctx.beginPath();
-        ctx.moveTo(paddingLeft, y);
-        ctx.lineTo(paddingLeft + chartWidth, y);
-        ctx.stroke();
-        ctx.setLineDash([]); // Reset dash
-        
-        ctx.fillStyle = "rgba(5, 255, 197, 0.75)";
-        ctx.fillText(`SUP: ${level.toFixed(2)}`, paddingLeft + 10, y - 6);
-    });
-
-    structure.resistances.forEach(level => {
-        const y = scaleY(level);
-        ctx.strokeStyle = "rgba(255, 59, 48, 0.35)"; // red dashed resistance
+        ctx.strokeStyle = "rgba(5, 255, 197, 0.35)";
         ctx.setLineDash([4, 4]);
         ctx.beginPath();
         ctx.moveTo(paddingLeft, y);
@@ -489,50 +575,55 @@ function drawChart(data) {
         ctx.stroke();
         ctx.setLineDash([]);
         
-        ctx.fillStyle = "rgba(255, 59, 48, 0.75)";
-        ctx.fillText(`RES: ${level.toFixed(2)}`, paddingLeft + 10, y - 6);
+        drawTextBox(`SUP: ${level.toFixed(2)}`, paddingLeft + 5, y, "#05ffc5", "left");
+    });
+
+    structure.resistances.forEach(level => {
+        const y = scaleY(level);
+        ctx.strokeStyle = "rgba(255, 59, 48, 0.35)";
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        ctx.moveTo(paddingLeft, y);
+        ctx.lineTo(paddingLeft + chartWidth, y);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        
+        drawTextBox(`RES: ${level.toFixed(2)}`, paddingLeft + 5, y, "#ff3b30", "left");
     });
 
     // 2. Draw active trade execution setup parameters (ENTRY, SL, TP)
     if (data.trade_setup) {
-        ctx.lineWidth = 2;
-        ctx.font = "bold 10px Outfit, sans-serif";
-        ctx.textAlign = "right";
-        
-        // 2a. Stop Loss Line
+        // Stop Loss Line
         const ySL = scaleY(data.trade_setup.stop_loss);
         ctx.strokeStyle = "#ff3b30";
+        ctx.lineWidth = 1.5;
         ctx.beginPath();
         ctx.moveTo(paddingLeft, ySL);
         ctx.lineTo(paddingLeft + chartWidth, ySL);
         ctx.stroke();
-        ctx.fillStyle = "#ff3b30";
-        ctx.fillText(`SL: ${data.trade_setup.stop_loss.toFixed(2)}`, paddingLeft + chartWidth - 10, ySL - 6);
+        drawTextBox(`SL: ${data.trade_setup.stop_loss.toFixed(2)}`, paddingLeft + chartWidth - 5, ySL, "#ff3b30", "right");
         
-        // 2b. Take Profit Line
+        // Take Profit Line
         const yTP = scaleY(data.trade_setup.take_profit);
         ctx.strokeStyle = "#05ffc5";
         ctx.beginPath();
         ctx.moveTo(paddingLeft, yTP);
         ctx.lineTo(paddingLeft + chartWidth, yTP);
         ctx.stroke();
-        ctx.fillStyle = "#05ffc5";
-        ctx.fillText(`TP: ${data.trade_setup.take_profit.toFixed(2)}`, paddingLeft + chartWidth - 10, yTP - 6);
+        drawTextBox(`TP: ${data.trade_setup.take_profit.toFixed(2)}`, paddingLeft + chartWidth - 5, yTP, "#05ffc5", "right");
         
-        // 2c. Entry Line (Drawn on top)
+        // Entry Line
         const yEntry = scaleY(data.trade_setup.entry);
         ctx.strokeStyle = "#ffd700";
         ctx.beginPath();
         ctx.moveTo(paddingLeft, yEntry);
         ctx.lineTo(paddingLeft + chartWidth, yEntry);
         ctx.stroke();
-        ctx.fillStyle = "#ffd700";
-        ctx.fillText(`ENTRY: ${data.trade_setup.entry.toFixed(2)}`, paddingLeft + chartWidth - 10, yEntry - 6);
+        drawTextBox(`ENTRY: ${data.trade_setup.entry.toFixed(2)}`, paddingLeft + chartWidth - 5, yEntry, "#ffd700", "right");
     }
 
     // 3. Draw Candlesticks
-    ctx.textAlign = "center";
-    history.forEach((candle, idx) => {
+    visibleHistory.forEach((candle, idx) => {
         const x = paddingLeft + idx * candleWidth + candleWidth / 2;
         const yOpen = scaleY(candle.open);
         const yClose = scaleY(candle.close);
@@ -559,9 +650,10 @@ function drawChart(data) {
         const bodyY = Math.min(yOpen, yClose);
         ctx.fillRect(bodyX, bodyY, bodyWidth, bodyHeight);
 
-        // Draw Time label axis
+        // Draw Time labels on X-axis (offset based on viewport mapping)
         if (idx % 8 === 0) {
-            ctx.fillStyle = "var(--text-secondary)";
+            ctx.fillStyle = "#ffffff"; // Brighter white for time labels
+            ctx.font = "9px Outfit, sans-serif";
             ctx.textAlign = "center";
             ctx.textBaseline = "top";
             try {
@@ -576,30 +668,47 @@ function drawChart(data) {
     // 4. Draw EMA curves overlay
     // Draw EMA 20 (Gold line)
     if (ema20.length > 0) {
-        ctx.strokeStyle = "#ffd700"; // Gold
+        ctx.strokeStyle = "#ffd700";
         ctx.lineWidth = 1.5;
         ctx.beginPath();
-        const startIdx = history.length - ema20.length;
-        ctx.moveTo(paddingLeft + startIdx * candleWidth + candleWidth/2, scaleY(ema20[0]));
-        for (let i = 1; i < ema20.length; i++) {
-            const idx = startIdx + i;
-            const x = paddingLeft + idx * candleWidth + candleWidth/2;
-            ctx.lineTo(x, scaleY(ema20[i]));
+        let firstDrawn = false;
+        
+        for (let i = 0; i < visibleHistory.length; i++) {
+            // Map visible candle index to absolute history index
+            const absIdx = startIdx + i;
+            const emaIdx = absIdx - (history.length - ema20.length);
+            if (emaIdx >= 0 && emaIdx < ema20.length) {
+                const x = paddingLeft + i * candleWidth + candleWidth/2;
+                if (!firstDrawn) {
+                    ctx.moveTo(x, scaleY(ema20[emaIdx]));
+                    firstDrawn = true;
+                } else {
+                    ctx.lineTo(x, scaleY(ema20[emaIdx]));
+                }
+            }
         }
         ctx.stroke();
     }
 
     // Draw EMA 50 (Purple line)
     if (ema50.length > 0) {
-        ctx.strokeStyle = "#a855f7"; // Purple
+        ctx.strokeStyle = "#a855f7";
         ctx.lineWidth = 1.5;
         ctx.beginPath();
-        const startIdx = history.length - ema50.length;
-        ctx.moveTo(paddingLeft + startIdx * candleWidth + candleWidth/2, scaleY(ema50[0]));
-        for (let i = 1; i < ema50.length; i++) {
-            const idx = startIdx + i;
-            const x = paddingLeft + idx * candleWidth + candleWidth/2;
-            ctx.lineTo(x, scaleY(ema50[i]));
+        let firstDrawn = false;
+        
+        for (let i = 0; i < visibleHistory.length; i++) {
+            const absIdx = startIdx + i;
+            const emaIdx = absIdx - (history.length - ema50.length);
+            if (emaIdx >= 0 && emaIdx < ema50.length) {
+                const x = paddingLeft + i * candleWidth + candleWidth/2;
+                if (!firstDrawn) {
+                    ctx.moveTo(x, scaleY(ema50[emaIdx]));
+                    firstDrawn = true;
+                } else {
+                    ctx.lineTo(x, scaleY(ema50[emaIdx]));
+                }
+            }
         }
         ctx.stroke();
     }
