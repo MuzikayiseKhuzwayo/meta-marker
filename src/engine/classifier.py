@@ -182,20 +182,80 @@ class MarketClassifier:
             confidence_buy = 50.0
             confidence_sell = 50.0
             
-        # Determine actionable recommendation
+        # Determine actionable recommendation and trade parameters
         recommendation = "HOLD / NEUTRAL"
+        trade_setup = None
+        
         if confidence_buy > 65:
-            recommendation = f"STRONG BUY ({confidence_buy:.1f}% confidence)"
+            # Identify nearest support level below current price
+            sups = [s for s in pa.get("support", []) if s < last_close]
+            support_level = sups[-1] if sups else (last_close - 2.5 * last_atr if last_atr > 0 else last_close * 0.99)
+            
+            entry = last_close
+            stop_loss = support_level - (0.5 * last_atr if last_atr > 0 else last_close * 0.002)
+            risk = entry - stop_loss
+            if risk <= 0:
+                risk = last_close * 0.005
+                stop_loss = entry - risk
+            take_profit = entry + 2.0 * risk
+            
+            # Kelly sizing: R = 2.0, Half-Kelly formula
+            p = confidence_buy / 100.0
+            f = p - (1.0 - p) / 2.0
+            kelly_pct = max(0.0, (f / 2.0) * 100.0)
+            kelly_pct = min(kelly_pct, 5.0)  # Max risk safety cap at 5%
+            
+            from .models import TradeSetup
+            trade_setup = TradeSetup(
+                entry=entry,
+                stop_loss=stop_loss,
+                take_profit=take_profit,
+                kelly_percentage=kelly_pct
+            )
+            
+            prefix = "★ MAX CONFIDENCE SETUP ★ " if confidence_buy >= 99.9 else ""
+            recommendation = f"{prefix}STRONG BUY ({confidence_buy:.1f}% confidence)"
             if primary_regime == "Mean Reversion":
                 recommendation += " - Mean Reversion long entry at support."
             else:
                 recommendation += " - Trend continuation long breakout."
+            recommendation += f" | Entry: {entry:.2f} | SL: {stop_loss:.2f} | TP: {take_profit:.2f} | Risk Sizing: {kelly_pct:.1f}% (Half-Kelly)"
+            
         elif confidence_sell > 65:
-            recommendation = f"STRONG SELL ({confidence_sell:.1f}% confidence)"
+            # Identify nearest resistance level above current price
+            resists = [r for r in pa.get("resistance", []) if r > last_close]
+            resist_level = resists[-1] if resists else (last_close + 2.5 * last_atr if last_atr > 0 else last_close * 1.01)
+            
+            entry = last_close
+            stop_loss = resist_level + (0.5 * last_atr if last_atr > 0 else last_close * 0.002)
+            risk = stop_loss - entry
+            if risk <= 0:
+                risk = last_close * 0.005
+                stop_loss = entry + risk
+            take_profit = entry - 2.0 * risk
+            
+            # Kelly sizing: R = 2.0, Half-Kelly formula
+            p = confidence_sell / 100.0
+            f = p - (1.0 - p) / 2.0
+            kelly_pct = max(0.0, (f / 2.0) * 100.0)
+            kelly_pct = min(kelly_pct, 5.0)  # Max risk safety cap at 5%
+            
+            from .models import TradeSetup
+            trade_setup = TradeSetup(
+                entry=entry,
+                stop_loss=stop_loss,
+                take_profit=take_profit,
+                kelly_percentage=kelly_pct
+            )
+            
+            prefix = "★ MAX CONFIDENCE SETUP ★ " if confidence_sell >= 99.9 else ""
+            recommendation = f"{prefix}STRONG SELL ({confidence_sell:.1f}% confidence)"
             if primary_regime == "Mean Reversion":
                 recommendation += " - Mean Reversion short entry at resistance."
             else:
                 recommendation += " - Trend continuation short breakout."
+            recommendation += f" | Entry: {entry:.2f} | SL: {stop_loss:.2f} | TP: {take_profit:.2f} | Risk Sizing: {kelly_pct:.1f}% (Half-Kelly)"
+            
         else:
             if primary_regime == "Mean Reversion":
                 recommendation = "NEUTRAL - Market in tight range. Wait for breakout or limit orders at boundaries."
@@ -209,5 +269,6 @@ class MarketClassifier:
             confidence_buy=confidence_buy,
             confidence_sell=confidence_sell,
             recommendation=recommendation,
-            history=candles[-40:]
+            history=candles[-40:],
+            trade_setup=trade_setup
         )

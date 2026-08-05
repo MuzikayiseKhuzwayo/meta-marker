@@ -460,8 +460,11 @@ function drawChart(data) {
     // Calculate Swing Structure floors and ceilings
     const structure = identifySwingLevels(history);
 
-    // 1. Draw Support and Resistance zones overlay (dashed indicator lines)
+    // 1. Draw Support and Resistance zones overlay (dashed indicator lines with labels)
     ctx.lineWidth = 1;
+    ctx.font = "9px Outfit, sans-serif";
+    ctx.textAlign = "left";
+    
     structure.supports.forEach(level => {
         const y = scaleY(level);
         ctx.strokeStyle = "rgba(5, 255, 197, 0.35)"; // green dashed support
@@ -471,6 +474,9 @@ function drawChart(data) {
         ctx.lineTo(paddingLeft + chartWidth, y);
         ctx.stroke();
         ctx.setLineDash([]); // Reset dash
+        
+        ctx.fillStyle = "rgba(5, 255, 197, 0.75)";
+        ctx.fillText(`SUP: ${level.toFixed(2)}`, paddingLeft + 10, y - 6);
     });
 
     structure.resistances.forEach(level => {
@@ -482,9 +488,50 @@ function drawChart(data) {
         ctx.lineTo(paddingLeft + chartWidth, y);
         ctx.stroke();
         ctx.setLineDash([]);
+        
+        ctx.fillStyle = "rgba(255, 59, 48, 0.75)";
+        ctx.fillText(`RES: ${level.toFixed(2)}`, paddingLeft + 10, y - 6);
     });
 
-    // 2. Draw Candlesticks
+    // 2. Draw active trade execution setup parameters (ENTRY, SL, TP)
+    if (data.trade_setup) {
+        ctx.lineWidth = 2;
+        ctx.font = "bold 10px Outfit, sans-serif";
+        ctx.textAlign = "right";
+        
+        // 2a. Stop Loss Line
+        const ySL = scaleY(data.trade_setup.stop_loss);
+        ctx.strokeStyle = "#ff3b30";
+        ctx.beginPath();
+        ctx.moveTo(paddingLeft, ySL);
+        ctx.lineTo(paddingLeft + chartWidth, ySL);
+        ctx.stroke();
+        ctx.fillStyle = "#ff3b30";
+        ctx.fillText(`SL: ${data.trade_setup.stop_loss.toFixed(2)}`, paddingLeft + chartWidth - 10, ySL - 6);
+        
+        // 2b. Take Profit Line
+        const yTP = scaleY(data.trade_setup.take_profit);
+        ctx.strokeStyle = "#05ffc5";
+        ctx.beginPath();
+        ctx.moveTo(paddingLeft, yTP);
+        ctx.lineTo(paddingLeft + chartWidth, yTP);
+        ctx.stroke();
+        ctx.fillStyle = "#05ffc5";
+        ctx.fillText(`TP: ${data.trade_setup.take_profit.toFixed(2)}`, paddingLeft + chartWidth - 10, yTP - 6);
+        
+        // 2c. Entry Line (Drawn on top)
+        const yEntry = scaleY(data.trade_setup.entry);
+        ctx.strokeStyle = "#ffd700";
+        ctx.beginPath();
+        ctx.moveTo(paddingLeft, yEntry);
+        ctx.lineTo(paddingLeft + chartWidth, yEntry);
+        ctx.stroke();
+        ctx.fillStyle = "#ffd700";
+        ctx.fillText(`ENTRY: ${data.trade_setup.entry.toFixed(2)}`, paddingLeft + chartWidth - 10, yEntry - 6);
+    }
+
+    // 3. Draw Candlesticks
+    ctx.textAlign = "center";
     history.forEach((candle, idx) => {
         const x = paddingLeft + idx * candleWidth + candleWidth / 2;
         const yOpen = scaleY(candle.open);
@@ -526,7 +573,7 @@ function drawChart(data) {
         }
     });
 
-    // 3. Draw EMA curves overlay
+    // 4. Draw EMA curves overlay
     // Draw EMA 20 (Gold line)
     if (ema20.length > 0) {
         ctx.strokeStyle = "#ffd700"; // Gold

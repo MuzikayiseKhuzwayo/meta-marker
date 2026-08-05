@@ -24,6 +24,12 @@ class IndicatorSignal(BaseModel):
     signal: str = Field(..., description="e.g., 'BUY', 'SELL', 'NEUTRAL'")
     confidence: float = Field(..., description="Confidence weight between 0.0 and 1.0")
 
+class TradeSetup(BaseModel):
+    entry: float = Field(..., description="Target entry price")
+    stop_loss: float = Field(..., description="Stop loss price level")
+    take_profit: float = Field(..., description="Take profit price level")
+    kelly_percentage: float = Field(..., description="Recommended position risk sizing percentage using Kelly Criterion")
+
 class MarketStateResponse(BaseModel):
     symbol: str = Field("XAUUSD", description="Symbol name")
     timeframe: str = Field("M15", description="Time signature")
@@ -34,3 +40,4 @@ class MarketStateResponse(BaseModel):
     confidence_sell: float = Field(..., description="Overall Sell probability 0-100%")
     recommendation: str = Field(..., description="Actionable recommendation message")
     history: List[Candle] = Field(default_factory=list, description="Recent candle history for charting")
+    trade_setup: Optional[TradeSetup] = Field(None, description="Active calculated trade execution parameters")
