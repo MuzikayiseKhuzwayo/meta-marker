@@ -1,30 +1,22 @@
-import MetaTrader5 as mt5
 import asyncio
 from datetime import datetime, timezone
 import logging
 import os
 from dotenv import load_dotenv
-from typing import List, Dict, Any, Tuple, Set
+from typing import List, Dict, Any, Tuple, Set, Optional
 
 from .models import Candle
 from .db import Database
 from .scorer import IndicatorScorer
 from .classifier import MarketClassifier
+from .mt5_adapter import adapter, TIMEFRAME_NAME_TO_INT
 
 load_dotenv()
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("MT5Sync")
 
-TIMEFRAME_MAP = {
-    "M1": mt5.TIMEFRAME_M1,
-    "M5": mt5.TIMEFRAME_M5,
-    "M15": mt5.TIMEFRAME_M15,
-    "M30": mt5.TIMEFRAME_M30,
-    "H1": mt5.TIMEFRAME_H1,
-    "H4": mt5.TIMEFRAME_H4,
-    "D1": mt5.TIMEFRAME_D1
-}
+TIMEFRAME_MAP = TIMEFRAME_NAME_TO_INT
 
 # Callback registry to notify API/websockets when new state classifications are generated
 # This acts as our Pub/Sub channel for live streaming
@@ -53,6 +45,10 @@ class MT5SyncWorker:
         self.password = os.getenv("MT5_PASSWORD")
         self.server = os.getenv("MT5_SERVER")
 
+    @property
+    def is_synthetic(self) -> bool:
+        return adapter.is_synthetic
+
     def add_target(self, symbol: str, timeframe: str) -> bool:
         if timeframe not in TIMEFRAME_MAP:
             logger.error(f"Unsupported timeframe: {timeframe}")
@@ -79,28 +75,28 @@ class MT5SyncWorker:
         tf_const = TIMEFRAME_MAP[tf_str]
         symbol = symbol.upper()
         
-        # Initialize MT5 if needed
+        # Initialize MT5/adapter if needed
         init_success = False
         if self.login_id and self.password and self.server:
-            init_success = mt5.initialize(
+            init_success = adapter.initialize(
                 login=int(self.login_id),
                 password=self.password,
                 server=self.server
             )
         else:
-            init_success = mt5.initialize()
+            init_success = adapter.initialize()
 
         if not init_success:
-            logger.error(f"MT5 initialization failed in sync_single_target: {mt5.last_error()}")
+            logger.error(f"MT5/Adapter initialization failed in sync_single_target: {adapter.last_error()}")
             return
             
-        if not mt5.symbol_select(symbol, True):
+        if not adapter.symbol_select(symbol, True):
             logger.error(f"Failed to select symbol {symbol} in MT5 terminal.")
             return
 
-        rates = mt5.copy_rates_from_pos(symbol, tf_const, 0, 1000)
+        rates = adapter.copy_rates_from_pos(symbol, tf_const, 0, 1000)
         if rates is None or len(rates) == 0:
-            logger.error(f"Failed to copy rates for {symbol} on {tf_str}. Error: {mt5.last_error()}")
+            logger.error(f"Failed to copy rates for {symbol} on {tf_str}. Error: {adapter.last_error()}")
             return
 
         synced_candles: List[Candle] = []
@@ -147,43 +143,42 @@ class MT5SyncWorker:
 
     async def stop(self):
         self.is_running = False
-        mt5.shutdown()
-        logger.info("MT5 direct integration shut down.")
+        adapter.shutdown()
+        logger.info("MT5/Adapter integration shut down.")
 
     async def sync_loop(self):
         while self.is_running:
             try:
-                # 1. Initialize MT5 (with explicit login if configured, otherwise default parameters)
+                # 1. Initialize MT5/Adapter
                 init_success = False
                 if self.login_id and self.password and self.server:
-                    init_success = mt5.initialize(
+                    init_success = adapter.initialize(
                         login=int(self.login_id),
                         password=self.password,
                         server=self.server
                     )
                 else:
-                    init_success = mt5.initialize()
+                    init_success = adapter.initialize()
 
                 if not init_success:
-                    logger.error(f"MT5 initialization failed, error code: {mt5.last_error()}. Retrying in 10s...")
+                    logger.error(f"MT5 initialization failed, error code: {adapter.last_error()}. Retrying in 10s...")
                     await asyncio.sleep(10)
                     continue
 
                 # 2. Loop over all target symbols and timeframes
-                # Make a copy of targets to prevent concurrent modification issues
                 active_targets = list(self.targets)
                 for symbol, tf_str in active_targets:
                     tf_const = TIMEFRAME_MAP[tf_str]
                     
-                    # Ensure symbol is active in MT5 Market Watch
-                    if not mt5.symbol_select(symbol, True):
+                    # Ensure symbol is active
+                    if not adapter.symbol_select(symbol, True):
                         logger.error(f"Failed to select/activate symbol {symbol} in MT5 terminal.")
                         continue
                         
                     # Fetch rates (copy latest 1000 bars)
-                    rates = mt5.copy_rates_from_pos(symbol, tf_const, 0, 1000)
+                    rates = adapter.copy_rates_from_pos(symbol, tf_const, 0, 1000)
                     if rates is None or len(rates) == 0:
-                        logger.error(f"Failed to copy rates for {symbol} on {tf_str}. Error: {mt5.last_error()}")
+                        logger.error(f"Failed to copy rates for {symbol} on {tf_str}. Error: {adapter.last_error()}")
                         continue
 
                     # 3. Synchronize candles into database

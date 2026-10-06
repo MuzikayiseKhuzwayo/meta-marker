@@ -209,6 +209,9 @@ const TOPIC_EXPLANATIONS = {
 async function initDashboard() {
     setupSelectors();
     setupChartInteractions();
+    setupViewNavigation();
+    setupAuditHandlers();
+    fetchEngineHealth();
     await fetchActiveTargets();
     await fetchBrokerSymbols();
     await fetchDashboardData();
@@ -905,5 +908,160 @@ function drawChart(data) {
             }
         }
         ctx.stroke();
+    }
+}
+
+// ==========================================
+// Multi-View Navigation & Audit Telemetry
+// ==========================================
+
+function setupViewNavigation() {
+    const tabs = document.querySelectorAll(".nav-tab");
+    tabs.forEach(tab => {
+        tab.addEventListener("click", () => {
+            const targetView = tab.getAttribute("data-view");
+            tabs.forEach(t => t.classList.remove("active"));
+            tab.classList.add("active");
+
+            document.querySelectorAll(".view-panel").forEach(panel => {
+                panel.classList.remove("active");
+            });
+
+            const activePanel = document.getElementById(`view-${targetView}`);
+            if (activePanel) {
+                activePanel.classList.add("active");
+            }
+
+            if (targetView === "audit") {
+                fetchAuditData();
+            } else if (targetView === "diagnostics") {
+                fetchDiagnosticsData();
+            }
+        });
+    });
+}
+
+function setupAuditHandlers() {
+    const refreshBtn = document.getElementById("refresh-audit-btn");
+    if (refreshBtn) {
+        refreshBtn.addEventListener("click", () => {
+            fetchAuditData();
+        });
+    }
+}
+
+async function fetchEngineHealth() {
+    try {
+        const res = await fetch("/api/health");
+        if (res.ok) {
+            const data = await res.json();
+            const badge = document.getElementById("engine-mode-badge");
+            if (badge) {
+                if (data.is_synthetic) {
+                    badge.textContent = "SYNTHETIC SIM";
+                    badge.classList.add("synthetic");
+                } else {
+                    badge.textContent = "LIVE MT5";
+                    badge.classList.remove("synthetic");
+                }
+            }
+        }
+    } catch (e) {
+        console.warn("Failed to query engine health:", e);
+    }
+}
+
+async function fetchAuditData() {
+    const totalEl = document.getElementById("audit-total-count");
+    const resolvedEl = document.getElementById("audit-resolved-count");
+    const winRateEl = document.getElementById("audit-win-rate");
+    const tableBody = document.getElementById("audit-table-body");
+
+    try {
+        const res = await fetch("/api/predictions/history?limit=50");
+        if (res.ok) {
+            const data = await res.json();
+            if (totalEl) totalEl.textContent = data.total_audited;
+            if (resolvedEl) resolvedEl.textContent = data.resolved_count;
+            if (winRateEl) winRateEl.textContent = `${data.win_rate}%`;
+
+            if (tableBody) {
+                if (!data.predictions || data.predictions.length === 0) {
+                    tableBody.innerHTML = `<tr><td colspan="10" class="empty-state">No predictions audited yet. Waiting for candle transitions...</td></tr>`;
+                    return;
+                }
+
+                tableBody.innerHTML = "";
+                data.predictions.forEach(p => {
+                    const tr = document.createElement("tr");
+                    let statusClass = "status-pending";
+                    if (p.status === "SUCCESS_TP") statusClass = "status-success";
+                    else if (p.status === "FAIL_SL") statusClass = "status-fail";
+
+                    const recShort = (p.recommendation || "").replace("★ MAX CONFIDENCE SETUP ★ ", "").substring(0, 32);
+                    const slStr = p.stop_loss ? p.stop_loss.toFixed(2) : "---";
+                    const tpStr = p.take_profit ? p.take_profit.toFixed(2) : "---";
+                    const entryStr = p.entry_price ? p.entry_price.toFixed(2) : "---";
+
+                    tr.innerHTML = `
+                        <td style="color: var(--text-secondary); font-family: monospace;">#${p.id}</td>
+                        <td style="font-weight: 700;">${p.symbol}</td>
+                        <td style="color: var(--color-cyan);">${p.timeframe}</td>
+                        <td style="color: var(--text-secondary); font-size: 12px;">${p.primary_regime}</td>
+                        <td style="font-size: 12px;">${recShort}</td>
+                        <td style="font-family: monospace;">${entryStr}</td>
+                        <td style="font-family: monospace; color: var(--color-red);">${slStr}</td>
+                        <td style="font-family: monospace; color: var(--color-green);">${tpStr}</td>
+                        <td style="font-size: 12px; font-weight: 600;">${p.buy_confidence > 50 ? `${p.buy_confidence.toFixed(0)}% BUY` : `${p.sell_confidence.toFixed(0)}% SELL`}</td>
+                        <td><span class="status-pill ${statusClass}">${p.status}</span></td>
+                    `;
+                    tableBody.appendChild(tr);
+                });
+            }
+        }
+    } catch (err) {
+        console.error("Failed to load prediction audit history:", err);
+    }
+}
+
+async function fetchDiagnosticsData() {
+    try {
+        const [healthRes, diagRes] = await Promise.all([
+            fetch("/api/health"),
+            fetch("/api/diagnostics")
+        ]);
+
+        if (healthRes.ok && diagRes.ok) {
+            const health = await healthRes.json();
+            const diag = await diagRes.json();
+
+            const modeEl = document.getElementById("diag-bridge-mode");
+            const subEl = document.getElementById("diag-bridge-sub");
+            const memEl = document.getElementById("diag-memory");
+            const targetsEl = document.getElementById("diag-targets-count");
+            const rawDump = document.getElementById("raw-telemetry-json");
+            const pillsContainer = document.getElementById("monitored-pills");
+
+            if (modeEl) modeEl.textContent = health.mode;
+            if (subEl) subEl.textContent = health.is_synthetic ? "Synthetic Brownian Replay" : "Windows Native MT5 Terminal";
+            if (memEl) memEl.textContent = `${diag.process.memory_rss_mb} MB`;
+            if (targetsEl) targetsEl.textContent = `${diag.monitored_targets_count} Pairs`;
+
+            if (pillsContainer && health.active_targets) {
+                pillsContainer.innerHTML = "";
+                health.active_targets.forEach(t => {
+                    const pill = document.createElement("span");
+                    pill.className = "pill";
+                    pill.textContent = `${t.symbol} [${t.timeframe}]`;
+                    pillsContainer.appendChild(pill);
+                });
+            }
+
+            if (rawDump) {
+                rawDump.textContent = JSON.stringify({ health, diagnostics: diag }, null, 2);
+            }
+        }
+    } catch (e) {
+        console.error("Failed to fetch diagnostics:", e);
     }
 }

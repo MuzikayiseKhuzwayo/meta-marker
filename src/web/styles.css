@@ -735,3 +735,230 @@ body {
     background: var(--color-cyan);
     color: #0a0e17;
 }
+
+/* Multi-View Navigation Tabs */
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 32px;
+}
+
+.nav-tabs {
+    display: flex;
+    gap: 8px;
+    background: rgba(255, 255, 255, 0.03);
+    padding: 4px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+}
+
+.nav-tab {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    padding: 6px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: var(--font-sans);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.nav-tab:hover {
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.nav-tab.active {
+    background: rgba(0, 240, 255, 0.12);
+    color: var(--color-cyan);
+    border: 1px solid rgba(0, 240, 255, 0.3);
+}
+
+.tab-icon {
+    font-size: 14px;
+}
+
+/* View Panels Switching */
+.view-panel {
+    display: none;
+    animation: fadeIn 0.3s ease forwards;
+}
+
+.view-panel.active {
+    display: block;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Engine Mode Badge */
+.mode-badge {
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: rgba(5, 255, 197, 0.15);
+    color: var(--color-green);
+    border: 1px solid rgba(5, 255, 197, 0.3);
+}
+
+.mode-badge.synthetic {
+    background: rgba(168, 85, 247, 0.15);
+    color: #c084fc;
+    border: 1px solid rgba(168, 85, 247, 0.3);
+}
+
+/* Audit & Diagnostics Metrics Cards */
+.audit-summary-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.audit-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    backdrop-filter: blur(8px);
+}
+
+.audit-card-title {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+}
+
+.audit-card-val {
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--text-primary);
+}
+
+.audit-card-sub {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.accent-green { color: var(--color-green) !important; }
+.accent-cyan { color: var(--color-cyan) !important; }
+.accent-gold { color: var(--color-gold) !important; }
+.accent-purple { color: #c084fc !important; }
+
+/* Export and Action Buttons */
+.export-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, rgba(0, 240, 255, 0.2), rgba(168, 85, 247, 0.2));
+    border: 1px solid rgba(0, 240, 255, 0.4);
+    color: var(--color-cyan);
+    padding: 8px 14px;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 13px;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-top: 4px;
+}
+
+.export-btn:hover {
+    background: linear-gradient(135deg, rgba(0, 240, 255, 0.3), rgba(168, 85, 247, 0.3));
+    box-shadow: 0 0 12px rgba(0, 240, 255, 0.2);
+}
+
+.refresh-btn {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.refresh-btn:hover {
+    color: var(--text-primary);
+    border-color: var(--border-color-hover);
+}
+
+/* Status Badges */
+.status-pill {
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    display: inline-block;
+}
+
+.status-success {
+    background: rgba(5, 255, 197, 0.15);
+    color: var(--color-green);
+    border: 1px solid rgba(5, 255, 197, 0.3);
+}
+
+.status-fail {
+    background: rgba(255, 59, 48, 0.15);
+    color: var(--color-red);
+    border: 1px solid rgba(255, 59, 48, 0.3);
+}
+
+.status-pending {
+    background: rgba(255, 215, 0, 0.15);
+    color: var(--color-gold);
+    border: 1px solid rgba(255, 215, 0, 0.3);
+}
+
+/* Diagnostics 2-column layout */
+.diagnostics-two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+.pills-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 16px;
+}
+
+.pill {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-color);
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 13px;
+    color: var(--text-primary);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.json-dump {
+    background: rgba(10, 14, 23, 0.8);
+    border-radius: 6px;
+    padding: 16px;
+    font-family: monospace;
+    font-size: 12px;
+    color: #a5d6a7;
+    overflow-x: auto;
+    max-height: 350px;
+}

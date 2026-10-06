@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meta-Marker — Deterministic Market Intelligence Engine</title>
+    <meta name="description" content="Meta-Marker dynamically decouples market regime detection from indicator scoring with empirical win-rate weighting, Half-Kelly sizing, and universal MT5/Synthetic simulation.">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-body: #07090e;
+            --bg-card: rgba(13, 17, 26, 0.7);
+            --bg-card-hover: rgba(19, 26, 40, 0.85);
+            --border-dim: rgba(255, 255, 255, 0.07);
+            --border-highlight: rgba(0, 240, 255, 0.35);
+            --accent-cyan: #00f0ff;
+            --accent-green: #05ffc5;
+            --accent-purple: #a855f7;
+            --accent-gold: #ffd700;
+            --accent-red: #ff3b30;
+            --text-main: #f0f4f8;
+            --text-muted: #8a99ad;
+            --font-sans: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            font-family: var(--font-sans);
+            line-height: 1.6;
+            overflow-x: hidden;
+            background-image: 
+                radial-gradient(circle at 50% 0%, rgba(0, 240, 255, 0.08) 0%, transparent 60%),
+                radial-gradient(circle at 80% 20%, rgba(168, 85, 247, 0.06) 0%, transparent 50%);
+        }
+
+        /* Container */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 24px;
+        }
+
+        /* Top Navigation */
+        .navbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 24px 0;
+            border-bottom: 1px solid var(--border-dim);
+        }
+        .nav-brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-decoration: none;
+            color: var(--text-main);
+        }
+        .nav-logo-symbol {
+            color: var(--accent-cyan);
+            font-size: 24px;
+            text-shadow: 0 0 12px rgba(0, 240, 255, 0.6);
+        }
+        .nav-title {
+            font-weight: 800;
+            letter-spacing: 1.5px;
+            font-size: 1.25rem;
+        }
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+        .nav-link {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.95rem;
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+        .nav-link:hover { color: var(--text-main); }
+        .kbd-pill {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-dim);
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .kbd-pill:hover {
+            border-color: var(--accent-cyan);
+            color: var(--accent-cyan);
+        }
+        .btn-github {
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid var(--border-dim);
+            color: var(--text-main);
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+        }
+        .btn-github:hover {
+            background: rgba(255, 255, 255, 0.12);
+            border-color: rgba(255, 255, 255, 0.25);
+            transform: translateY(-1px);
+        }
+
+        /* Hero Section */
+        .hero {
+            padding: 90px 0 60px;
+            text-align: center;
+        }
+        .hero-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(0, 240, 255, 0.08);
+            border: 1px solid rgba(0, 240, 255, 0.25);
+            color: var(--accent-cyan);
+            padding: 6px 16px;
+            border-radius: 30px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            margin-bottom: 24px;
+        }
+        .hero h1 {
+            font-size: 3.8rem;
+            font-weight: 900;
+            line-height: 1.1;
+            letter-spacing: -1px;
+            margin-bottom: 24px;
+        }
+        .hero-gradient-text {
+            background: linear-gradient(135deg, #ffffff 30%, var(--accent-cyan) 75%, var(--accent-purple) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .hero-desc {
+            max-width: 740px;
+            margin: 0 auto 36px;
+            font-size: 1.25rem;
+            color: var(--text-muted);
+            line-height: 1.6;
+        }
+        .hero-actions {
+            display: flex;
+            justify-content: center;
+            gap: 16px;
+            margin-bottom: 60px;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent-cyan), #0077ff);
+            color: #07090e;
+            padding: 14px 28px;
+            border-radius: 10px;
+            font-weight: 700;
+            font-size: 1rem;
+            text-decoration: none;
+            box-shadow: 0 0 25px rgba(0, 240, 255, 0.35);
+            transition: all 0.2s;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 0 35px rgba(0, 240, 255, 0.5);
+        }
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-dim);
+            color: var(--text-main);
+            padding: 14px 28px;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 1rem;
+            text-decoration: none;
+            transition: all 0.2s;
+        }
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+        }
+
+        /* Interactive Simulator Cockpit Preview */
+        .simulator-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-dim);
+            border-radius: 16px;
+            backdrop-filter: blur(16px);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+            overflow: hidden;
+            margin-bottom: 90px;
+            text-align: left;
+        }
+        .simulator-topbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.4);
+            padding: 12px 20px;
+            border-bottom: 1px solid var(--border-dim);
+        }
+        .sim-dots {
+            display: flex;
+            gap: 8px;
+        }
+        .sim-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+        .dot-red { background: #ff5f56; }
+        .dot-yellow { background: #ffbd2e; }
+        .dot-green { background: #27c93f; }
+        .sim-title {
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+        .simulator-body {
+            padding: 24px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+        }
+        .sim-terminal {
+            background: #000;
+            border-radius: 8px;
+            padding: 20px;
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            color: #a5d6a7;
+            overflow-x: auto;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .sim-terminal .cmd { color: var(--accent-cyan); font-weight: bold; }
+        .sim-terminal .val { color: #fff; }
+        .sim-terminal .accent { color: var(--accent-gold); }
+        .sim-cockpit-widget {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .widget-box {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border-dim);
+            border-radius: 10px;
+            padding: 16px;
+        }
+        .widget-title {
+            font-size: 0.75rem;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+            font-weight: 700;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+        .widget-regime {
+            font-size: 1.4rem;
+            font-weight: 800;
+            color: var(--accent-green);
+        }
+        .confidence-bar-wrap {
+            height: 10px;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 6px;
+            overflow: hidden;
+            margin: 8px 0;
+        }
+        .confidence-bar-fill {
+            height: 100%;
+            width: 84%;
+            background: linear-gradient(90deg, var(--accent-cyan), var(--accent-green));
+            border-radius: 6px;
+        }
+
+        /* 3-Layer Architecture Section */
+        .section-header {
+            text-align: center;
+            margin-bottom: 50px;
+        }
+        .section-tag {
+            font-size: 0.8rem;
+            font-weight: 800;
+            letter-spacing: 1.5px;
+            color: var(--accent-cyan);
+            text-transform: uppercase;
+            margin-bottom: 12px;
+            display: block;
+        }
+        .section-title {
+            font-size: 2.5rem;
+            font-weight: 800;
+            margin-bottom: 16px;
+        }
+        .section-desc {
+            max-width: 600px;
+            margin: 0 auto;
+            color: var(--text-muted);
+            font-size: 1.1rem;
+        }
+
+        .architecture-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
+            margin-bottom: 90px;
+        }
+        .arch-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-dim);
+            border-radius: 14px;
+            padding: 30px;
+            transition: all 0.3s;
+        }
+        .arch-card:hover {
+            border-color: var(--border-highlight);
+            transform: translateY(-4px);
+            background: var(--bg-card-hover);
+        }
+        .arch-layer-pill {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 800;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            margin-bottom: 16px;
+        }
+        .layer-1-pill { background: rgba(0, 240, 255, 0.15); color: var(--accent-cyan); }
+        .layer-2-pill { background: rgba(168, 85, 247, 0.15); color: var(--accent-purple); }
+        .layer-3-pill { background: rgba(5, 255, 197, 0.15); color: var(--accent-green); }
+        .arch-card h3 {
+            font-size: 1.35rem;
+            font-weight: 700;
+            margin-bottom: 12px;
+        }
+        .arch-card p {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+            line-height: 1.6;
+            margin-bottom: 16px;
+        }
+        .arch-list {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .arch-list li {
+            font-size: 0.85rem;
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .arch-list li::before {
+            content: "✓";
+            color: var(--accent-cyan);
+            font-weight: bold;
+        }
+
+        /* Diátaxis Documentation Matrix */
+        .diataxis-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+            margin-bottom: 90px;
+        }
+        .diataxis-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-dim);
+            border-radius: 12px;
+            padding: 28px;
+            text-decoration: none;
+            color: inherit;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            transition: all 0.2s;
+        }
+        .diataxis-card:hover {
+            border-color: var(--accent-cyan);
+            transform: translateY(-2px);
+            background: var(--bg-card-hover);
+        }
+        .diataxis-tag {
+            font-size: 0.75rem;
+            font-weight: 800;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            color: var(--accent-cyan);
+            margin-bottom: 8px;
+        }
+        .diataxis-card h4 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+        .diataxis-card p {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            line-height: 1.5;
+            margin-bottom: 16px;
+        }
+        .diataxis-card .link-arrow {
+            font-size: 0.9rem;
+            color: var(--accent-cyan);
+            font-weight: 600;
+        }
+
+        /* Footer */
+        footer {
+            border-top: 1px solid var(--border-dim);
+            padding: 40px 0;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+        footer a {
+            color: var(--accent-cyan);
+            text-decoration: none;
+        }
+
+        /* Command Palette Modal (Ctrl+K) */
+        .modal-palette {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(8px);
+            z-index: 9999;
+            align-items: flex-start;
+            justify-content: center;
+            padding-top: 120px;
+        }
+        .modal-palette.open { display: flex; }
+        .palette-window {
+            background: #0d121c;
+            border: 1px solid var(--border-highlight);
+            width: 100%;
+            max-width: 600px;
+            border-radius: 12px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8);
+            overflow: hidden;
+        }
+        .palette-input-wrap {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border-dim);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .palette-input {
+            width: 100%;
+            background: transparent;
+            border: none;
+            color: #fff;
+            font-family: var(--font-sans);
+            font-size: 1.1rem;
+            outline: none;
+        }
+        .palette-results {
+            list-style: none;
+            max-height: 300px;
+            overflow-y: auto;
+            padding: 8px;
+        }
+        .palette-item {
+            padding: 12px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            color: var(--text-main);
+            text-decoration: none;
+        }
+        .palette-item:hover, .palette-item.selected {
+            background: rgba(0, 240, 255, 0.1);
+            color: var(--accent-cyan);
+        }
+        .palette-item-tag {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            font-family: var(--font-mono);
+        }
+
+        @media (max-width: 860px) {
+            .hero h1 { font-size: 2.6rem; }
+            .simulator-body { grid-template-columns: 1fr; }
+            .architecture-grid { grid-template-columns: 1fr; }
+            .diataxis-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <!-- Navbar -->
+        <header class="navbar">
+            <a href="https://github.com/MuzikayiseKhuzwayo/meta-marker" class="nav-brand">
+                <span class="nav-logo-symbol">◆</span>
+                <span class="nav-title">META-MARKER</span>
+            </a>
+            <div class="nav-links">
+                <a href="https://github.com/MuzikayiseKhuzwayo/meta-marker#documentation-diátaxis-framework" class="nav-link">Documentation</a>
+                <a href="https://github.com/MuzikayiseKhuzwayo/meta-marker/blob/main/docs/reference/01-rest-and-websocket-api.md" class="nav-link">API Spec</a>
+                <div class="kbd-pill" id="open-palette-btn">
+                    <span>Search docs</span>
+                    <kbd>Ctrl+K</kbd>
+                </div>
+                <a href="https://github.com/MuzikayiseKhuzwayo/meta-marker" class="btn-github" target="_blank" rel="noopener noreferrer">
+                    <span>★ GitHub</span>
+                </a>
+            </div>
+        </header>
+
+        <!-- Hero -->
+        <section class="hero">
+            <div class="hero-badge">
+                <span>◆ Deterministic Market Intelligence Engine V1.0</span>
+            </div>
+            <h1>
+                Stop Trading<br>
+                <span class="hero-gradient-text">Yesterday's Regime.</span>
+            </h1>
+            <p class="hero-desc">
+                Meta-Marker dynamically decouples market regime detection from indicator scoring. Track empirical win-rates on closed bars, calculate Half-Kelly position sizing, and bridge seamlessly to MetaTrader 5 or synthetic simulation.
+            </p>
+            <div class="hero-actions">
+                <a href="https://github.com/MuzikayiseKhuzwayo/meta-marker" class="btn-primary" target="_blank" rel="noopener noreferrer">
+                    Get Started on GitHub
+                </a>
+                <a href="https://github.com/MuzikayiseKhuzwayo/meta-marker/blob/main/docs/tutorials/01-zero-to-one-quickstart.md" class="btn-secondary" target="_blank" rel="noopener noreferrer">
+                    Read 10-Min Quickstart
+                </a>
+            </div>
+
+            <!-- Simulator Card Preview -->
+            <div class="simulator-card">
+                <div class="simulator-topbar">
+                    <div class="sim-dots">
+                        <span class="sim-dot dot-red"></span>
+                        <span class="sim-dot dot-yellow"></span>
+                        <span class="sim-dot dot-green"></span>
+                    </div>
+                    <span class="sim-title">meta-marker CLI &bull; XAUUSD M15 Live Classification</span>
+                    <span style="font-size: 0.8rem; color: var(--accent-cyan); font-family: var(--font-mono);">● ENGINE READY</span>
+                </div>
+                <div class="simulator-body">
+                    <div class="sim-terminal">
+                        <p><span class="cmd">$ uv run meta-marker classify --symbol XAUUSD --timeframe M15</span></p>
+                        <br>
+                        <p>--- Meta-Marker Classification: XAUUSD [M15] ---</p>
+                        <p>Price (Close):     <span class="val">2354.20</span></p>
+                        <p>Primary Regime:    <span class="val">Trend Following</span></p>
+                        <p>Trend State:       <span class="val">Strong Uptrend</span></p>
+                        <p>Volatility:        <span class="val">Medium</span></p>
+                        <p>Momentum:          <span class="val">Bullish</span></p>
+                        <p>Buy Confidence:    <span class="accent">82.4%</span></p>
+                        <p>Sell Confidence:   <span class="val">17.6%</span></p>
+                        <br>
+                        <p><span class="accent">★ STRONG BUY SETUP ★</span></p>
+                        <p>Entry: 2354.20 | SL: 2342.10 | TP: 2378.40</p>
+                        <p>Half-Kelly Risk Sizing: <span class="accent">3.2%</span></p>
+                    </div>
+                    <div class="sim-cockpit-widget">
+                        <div class="widget-box">
+                            <span class="widget-title">IDENTIFIED REGIME</span>
+                            <div class="widget-regime">TREND FOLLOWING</div>
+                            <span style="font-size: 0.85rem; color: var(--text-muted);">ADX: 28.4 &bull; EMAs Golden Cross Alignment</span>
+                        </div>
+                        <div class="widget-box">
+                            <div style="display: flex; justify-content: space-between;">
+                                <span class="widget-title">CONFIDENCE CONSENSUS</span>
+                                <span style="font-weight: 800; color: var(--accent-cyan);">82.4% BUY</span>
+                            </div>
+                            <div class="confidence-bar-wrap">
+                                <div class="confidence-bar-fill"></div>
+                            </div>
+                            <span style="font-size: 0.8rem; color: var(--text-muted);">Dynamic Reliability weighted across 5 models</span>
+                        </div>
+                        <div class="widget-box" style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <span class="widget-title">BRIDGE TELEMETRY</span>
+                                <div style="font-weight: 700; font-size: 0.95rem;">LIVE_MT5 / SYNTHETIC</div>
+                            </div>
+                            <span style="background: rgba(5,255,197,0.15); color: var(--accent-green); padding: 4px 10px; border-radius: 6px; font-size: 0.8rem; font-weight: 800;">
+                                LOW LATENCY
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 3-Tier Architecture Section -->
+        <section style="padding: 40px 0;">
+            <div class="section-header">
+                <span class="section-tag">ARCHITECTURAL BLUEPRINT</span>
+                <h2 class="section-title">Engineered for Pure Determinism</h2>
+                <p class="section-desc">
+                    Three clean layers decouple operator presentation from gateway orchestration and mathematical execution.
+                </p>
+            </div>
+            <div class="architecture-grid">
+                <div class="arch-card">
+                    <span class="arch-layer-pill layer-1-pill">Layer 1: Presentation</span>
+                    <h3>Cockpit & Showcase</h3>
+                    <p>Dark cyberpunk web interface rendering high-frequency canvas candlestick charts with interactive drag/pan history.</p>
+                    <ul class="arch-list">
+                        <li>Real-time HTML5 Canvas Chart</li>
+                        <li>SVG Dual-Arc Confidence Dial</li>
+                        <li>Prediction Audit Ledger & CSV Export</li>
+                        <li>Engine Bridge Diagnostics Tab</li>
+                    </ul>
+                </div>
+                <div class="arch-card">
+                    <span class="arch-layer-pill layer-2-pill">Layer 2: Gateway</span>
+                    <h3>Unified Control & Stream</h3>
+                    <p>Single-port FastAPI server consolidating REST queries, WebSocket broadcasts, and first-class CLI subcommands.</p>
+                    <ul class="arch-list">
+                        <li>WebSocket <code>/ws</code> Real-Time Pub/Sub</li>
+                        <li>Audit CSV & Candle JSON Exports</li>
+                        <li>First-class CLI (serve, classify, audit)</li>
+                        <li>Health & Memory Telemetry Endpoints</li>
+                    </ul>
+                </div>
+                <div class="arch-card">
+                    <span class="arch-layer-pill layer-3-pill">Layer 3: Execution</span>
+                    <h3>Deterministic Engine</h3>
+                    <p>Stateless indicator mathematics, closed-bar empirical scoring, and SQLite persistence with universal fallback.</p>
+                    <ul class="arch-list">
+                        <li>MT5 Native DLL + Synthetic Brownian Sim</li>
+                        <li>ADX, EMA, RSI, MACD, Stochastic, BOS</li>
+                        <li>Closed-Bar Win-Rate Scoring Loop</li>
+                        <li>Half-Kelly Dynamic Position Sizing</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- Diátaxis Quadrants Section -->
+        <section style="padding: 40px 0 80px;">
+            <div class="section-header">
+                <span class="section-tag">DOCUMENTATION TAXONOMY</span>
+                <h2 class="section-title">Built on the Diátaxis Framework</h2>
+                <p class="section-desc">
+                    Tailored documentation structures for learning, problem-solving, reference, and deep conceptual understanding.
+                </p>
+            </div>
+            <div class="diataxis-grid">
+                <a href="https://github.com/MuzikayiseKhuzwayo/meta-marker/blob/main/docs/tutorials/01-zero-to-one-quickstart.md" class="diataxis-card" target="_blank" rel="noopener noreferrer">
+                    <div>
+                        <span class="diataxis-tag">Tutorials &bull; Learning-Oriented</span>
+                        <h4>Zero-to-One Quickstart</h4>
+                        <p>A step-by-step 10-minute guide to setting up UV, launching the unified cockpit, and running your first market analysis.</p>
+                    </div>
+                    <span class="link-arrow">Read Tutorial &rarr;</span>
+                </a>
+                <a href="https://github.com/MuzikayiseKhuzwayo/meta-marker/blob/main/docs/how-to/01-connect-mt5-broker.md" class="diataxis-card" target="_blank" rel="noopener noreferrer">
+                    <div>
+                        <span class="diataxis-tag">How-To Guides &bull; Problem-Oriented</span>
+                        <h4>Connect Live MT5 & Headless Simulation</h4>
+                        <p>Actionable recipes for linking live broker terminals on Windows or running in Docker/CI with synthetic Brownian motion.</p>
+                    </div>
+                    <span class="link-arrow">View Guides &rarr;</span>
+                </a>
+                <a href="https://github.com/MuzikayiseKhuzwayo/meta-marker/blob/main/docs/reference/01-rest-and-websocket-api.md" class="diataxis-card" target="_blank" rel="noopener noreferrer">
+                    <div>
+                        <span class="diataxis-tag">Reference &bull; Information-Oriented</span>
+                        <h4>REST API, WebSockets & Database Specs</h4>
+                        <p>Machine-accurate specifications for all endpoints, WebSocket payloads, CLI parameters, and SQLite schema tables.</p>
+                    </div>
+                    <span class="link-arrow">Browse Reference &rarr;</span>
+                </a>
+                <a href="https://github.com/MuzikayiseKhuzwayo/meta-marker/blob/main/docs/explanation/01-market-regime-theory.md" class="diataxis-card" target="_blank" rel="noopener noreferrer">
+                    <div>
+                        <span class="diataxis-tag">Explanation &bull; Understanding-Oriented</span>
+                        <h4>Market Regime Theory & Kelly Criterion</h4>
+                        <p>Deep mathematical formulations of dynamic indicator weighting, regime classification, and Half-Kelly capital sizing.</p>
+                    </div>
+                    <span class="link-arrow">Explore Theory &rarr;</span>
+                </a>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer>
+            <div class="container">
+                <p style="margin-bottom: 8px;">
+                    <strong>Meta-Marker</strong> &bull; Released under the <a href="https://github.com/MuzikayiseKhuzwayo/meta-marker/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">MIT License</a>.
+                </p>
+                <p>
+                    Maintained by <a href="https://github.com/MuzikayiseKhuzwayo" target="_blank" rel="noopener noreferrer">Muzikayise Khuzwayo</a> &bull; Canonical Repository: <a href="https://github.com/MuzikayiseKhuzwayo/meta-marker" target="_blank" rel="noopener noreferrer">github.com/MuzikayiseKhuzwayo/meta-marker</a>
+                </p>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Command Palette Modal (Ctrl+K) -->
+    <div class="modal-palette" id="palette-modal">
+        <div class="palette-window">
+            <div class="palette-input-wrap">
+                <span style="color: var(--accent-cyan); font-size: 1.2rem;">◆</span>
+                <input type="text" id="palette-search" class="palette-input" placeholder="Type a command or jump to documentation..." autofocus>
+            </div>
+            <ul class="palette-results">
+                <li>
+                    <a href="https://github.com/MuzikayiseKhuzwayo/meta-marker/blob/main/docs/tutorials/01-zero-to-one-quickstart.md" class="palette-item" target="_blank" rel="noopener noreferrer">
+                        <span>Tutorial: Zero-to-One Quickstart</span>
+                        <span class="palette-item-tag">TUTORIAL</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="https://github.com/MuzikayiseKhuzwayo/meta-marker/blob/main/docs/how-to/01-connect-mt5-broker.md" class="palette-item" target="_blank" rel="noopener noreferrer">
+                        <span>How-To: Connect Live MT5 Terminal</span>
+                        <span class="palette-item-tag">HOW-TO</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="https://github.com/MuzikayiseKhuzwayo/meta-marker/blob/main/docs/how-to/02-running-headless-synthetic-mode.md" class="palette-item" target="_blank" rel="noopener noreferrer">
+                        <span>How-To: Headless & Synthetic Simulation</span>
+                        <span class="palette-item-tag">HOW-TO</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="https://github.com/MuzikayiseKhuzwayo/meta-marker/blob/main/docs/reference/01-rest-and-websocket-api.md" class="palette-item" target="_blank" rel="noopener noreferrer">
+                        <span>Reference: REST & WebSocket API Specification</span>
+                        <span class="palette-item-tag">REFERENCE</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="https://github.com/MuzikayiseKhuzwayo/meta-marker/blob/main/docs/reference/03-cli-reference.md" class="palette-item" target="_blank" rel="noopener noreferrer">
+                        <span>Reference: CLI Command Reference</span>
+                        <span class="palette-item-tag">REFERENCE</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="https://github.com/MuzikayiseKhuzwayo/meta-marker/blob/main/docs/explanation/01-market-regime-theory.md" class="palette-item" target="_blank" rel="noopener noreferrer">
+                        <span>Explanation: Market Regime Classification Theory</span>
+                        <span class="palette-item-tag">EXPLANATION</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="https://github.com/MuzikayiseKhuzwayo/meta-marker/blob/main/docs/explanation/02-dynamic-scoring-and-kelly-criterion.md" class="palette-item" target="_blank" rel="noopener noreferrer">
+                        <span>Explanation: Dynamic Reliability & Kelly Sizing</span>
+                        <span class="palette-item-tag">EXPLANATION</span>
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        // Command Palette Logic
+        const modal = document.getElementById("palette-modal");
+        const openBtn = document.getElementById("open-palette-btn");
+        const searchInput = document.getElementById("palette-search");
+
+        function openPalette() {
+            modal.classList.add("open");
+            searchInput.value = "";
+            searchInput.focus();
+        }
+
+        function closePalette() {
+            modal.classList.remove("open");
+        }
+
+        if (openBtn) openBtn.addEventListener("click", openPalette);
+        window.addEventListener("keydown", (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+                e.preventDefault();
+                modal.classList.contains("open") ? closePalette() : openPalette();
+            } else if (e.key === "Escape") {
+                closePalette();
+            }
+        });
+
+        modal.addEventListener("click", (e) => {
+            if (e.target === modal) closePalette();
+        });
+
+        // Search Filter
+        searchInput.addEventListener("input", (e) => {
+            const query = e.target.value.toLowerCase();
+            document.querySelectorAll(".palette-item").forEach(item => {
+                const text = item.textContent.toLowerCase();
+                item.style.display = text.includes(query) ? "flex" : "none";
+            });
+        });
+    </script>
+</body>
+</html>
